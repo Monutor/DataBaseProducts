@@ -61,6 +61,10 @@ export default function App() {
     if (IS_DEV) loadData()
   }, [loadData, IS_DEV])
 
+  useEffect(() => {
+    if (!IS_DEV && token) loadData()
+  }, [token, loadData, IS_DEV])
+
   const handleSaveToGitHub = async (updated: ProductRow[]) => {
     if (!IS_DEV && (!token || !sha)) return
     setSaving(true)
