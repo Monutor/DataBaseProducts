@@ -2,6 +2,7 @@ import { useState, useRef, useMemo } from 'react'
 import type { ProductRow } from '../csv/types'
 import './ImportDialog.css'
 import type { ParseResult } from '../shared/parser'
+import { parseCSV, parseXLSX } from '../shared/parser'
 
 interface Props {
   rows: ProductRow[]
@@ -57,10 +58,10 @@ export default function ImportDialog({ rows, onConfirm, onCancel }: Props) {
         reader.onerror = () => reject(new Error('Failed to read file'))
         reader.readAsText(file, 'utf-8')
       })
-      result = await (await import('../shared/parser')).parseCSV(text)
+      result = await parseCSV(text)
     } else if (ext === 'xlsx' || ext === 'xls') {
       const buffer = await readFileAsBuffer(file)
-      result = await (await import('../shared/parser')).parseXLSX(buffer)
+      result = await parseXLSX(buffer)
     } else {
       setParseError('Поддерживаются только CSV и XLSX файлы')
       setLoading(false)
