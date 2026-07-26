@@ -17,15 +17,21 @@ function encodeUTF8Base64(text: string): string {
 }
 
 export async function fetchJSON(token: string) {
-  const apiUrl = `https://api.github.com/repos/${OWNER}/${REPO}/contents/db.json`
-
-  const metaRes = await fetch(apiUrl, {
+  const refRes = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/git/ref/heads/main`, {
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' },
   })
-  if (!metaRes.ok) throw new Error('db.json not found in repository')
-  const meta = await metaRes.json()
-  const sha = (meta as { sha?: string }).sha
-  if (!sha) throw new Error('db.json not found in repository')
+  if (!refRes.ok) throw new Error('Failed to get repository ref')
+  const ref = await refRes.json()
+  const commitSha = ref.object.sha as string
+
+  const treeRes = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/git/trees/${commitSha}`, {
+    headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' },
+  })
+  if (!treeRes.ok) throw new Error('Failed to get repository tree')
+  const tree = await treeRes.json()
+  const entry = (tree.tree as Array<{ path: string; sha: string }>).find(e => e.path === 'db.json')
+  if (!entry) throw new Error('db.json not found in repository')
+  const sha = entry.sha
 
   const blobRes = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/git/blobs/${sha}`, {
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' },
