@@ -198,18 +198,19 @@ header h1 {
   color: #fff;
 }
 
-.btn-sew-load {
+.header-actions .btn-sew-load {
   padding: 6px 12px;
-  background: #0e639c;
-  color: #fff;
-  border: none;
+  background: #005a8e;
+  color: #ffffff;
+  border: 1px solid #004d7a;
   border-radius: 4px;
   cursor: pointer;
   font-size: 13px;
+  font-weight: 500;
 }
 
-.btn-sew-load:hover:not(:disabled) {
-  background: #1177bb;
+.header-actions .btn-sew-load:hover:not(:disabled) {
+  background: #006ba3;
 }
 
 .btn-sew-load:disabled {

@@ -103,7 +103,26 @@ export async function fetchFromSEW(token: string): Promise<ParseResult> {
     const arrayBuffer = await response.arrayBuffer()
 
     if (contentType.includes('json')) {
-      return { success: false, error: `SEW вернул JSON. Content-Type: ${contentType}` }
+      const text = new TextDecoder().decode(arrayBuffer)
+      try {
+        const json = JSON.parse(text)
+        const fileData = json?.responseBody?.fileData
+        if (typeof fileData === 'string' && fileData.length > 0) {
+          // Decode base64 to Blob, then read as ArrayBuffer
+          const blob = new Blob([new Uint8Array(atob(fileData).split('').map(c => c.charCodeAt(0)))], { type: 'application/octet-stream' })
+          const buffer = await new Promise<ArrayBuffer>((resolve, reject) => {
+            const reader = new FileReader()
+            reader.onload = () => resolve(reader.result as ArrayBuffer)
+            reader.onerror = () => reject(new Error('Failed to read blob'))
+            reader.readAsArrayBuffer(blob)
+          })
+          const result = await parseXLSX(buffer)
+          return result
+        }
+        return { success: false, error: `SEW вернул JSON без fileData. Ответ: ${JSON.stringify(json).slice(0, 500)}` }
+      } catch {
+        return { success: false, error: `SEW вернул JSON (не удалось распарсить): ${text.slice(0, 500)}` }
+      }
     }
 
     // Try XLSX first, then CSV as fallback
