@@ -1,0 +1,249 @@
+import { useState, useRef, useMemo } from 'react'
+import Papa from 'papaparse'
+import * as XLSX from 'xlsx'
+import type { ProductRow } from '../csv/types'
+import './ImportDialog.css'
+
+interface Props {
+  rows: ProductRow[]
+  onConfirm: (newRows: ProductRow[]) => void
+  onCancel: () => void
+}
+
+const EXISTING_ARTICLE = 'Код товара'
+
+function readFileAsBuffer(file: File): Promise<ArrayBuffer> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result as ArrayBuffer)
+    reader.onerror = () => reject(new Error('Failed to read file'))
+    reader.readAsArrayBuffer(file)
+  })
+}
+
+const PRODUCT_ROW_KEYS: (keyof ProductRow)[] = [
+  'Магазин', 'Зона', 'Ячейки хранения', 'ШК ячейки хранения', 'Код товара',
+  'Наименование', 'Количество', 'Тип', 'Этикетка', 'Группа 5', 'Группа 4',
+  'Группа 3', 'Группа 2', 'Группа 1', 'Бренд', 'ШК товара', 'Компонент',
+  'STOPSALE', 'ONLINE-ONLY', 'Маркетплейс', 'Маркированный', 'Время создания МСК',
+  'Последнее изменение МСК',
+]
+
+function parseToProductRows(data: Record<string, string>[]): ProductRow[] {
+  const sampleKeys = Object.keys(data[0] || {})
+  const keyMap: Record<string, keyof ProductRow> = {}
+  for (const k of PRODUCT_ROW_KEYS) {
+    const match = sampleKeys.find(s => s.trim() === k.trim())
+    if (match) keyMap[match] = k
+  }
+  return data.map(row => {
+    const out: ProductRow = {} as ProductRow
+    for (const destKey of PRODUCT_ROW_KEYS) {
+      ;(out as any)[destKey] = ''
+    }
+    for (const [srcKey, destKey] of Object.entries(keyMap)) {
+      const val = row[srcKey]
+      ;(out as any)[destKey] = val != null ? String(val) : ''
+    }
+    return out
+  })
+}
+
+type ParseResult = {
+  success: true
+  rows: ProductRow[]
+} | {
+  success: false
+  error: string
+}
+
+async function parseCSV(file: File): Promise<ParseResult> {
+  const text = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result as string)
+    reader.onerror = () => reject(new Error('Failed to read file'))
+    reader.readAsText(file, 'utf-8')
+  })
+  return new Promise(resolve => {
+    Papa.parse(text, {
+      header: true,
+      skipEmptyLines: true,
+      encoding: 'UTF-8',
+      complete(results) {
+        if (results.errors.length > 0) {
+          resolve({ success: false, error: results.errors[0].message })
+          return
+        }
+        const rows = parseToProductRows(results.data as Record<string, string>[])
+        resolve({ success: true, rows })
+      },
+      error(err: Error) {
+        resolve({ success: false, error: err.message })
+      },
+    })
+  })
+}
+
+async function parseXLSX(file: File): Promise<ParseResult> {
+  try {
+    const buffer = await readFileAsBuffer(file)
+    const workbook = XLSX.read(buffer, { type: 'array', cellDates: false, cellText: true, cellNF: false, WTF: false })
+    const sheetName = workbook.SheetNames[0]
+    if (!sheetName) return { success: false, error: 'Файл не содержит листов' }
+    const sheet = workbook.Sheets[sheetName]
+    const data = XLSX.utils.sheet_to_json<Record<string, string>>(sheet, { defval: '', raw: true })
+    if (data.length === 0) return { success: false, error: 'Файл не содержит данных' }
+    const rows = parseToProductRows(data)
+    return { success: true, rows }
+  } catch (e: unknown) {
+    return { success: false, error: e instanceof Error ? e.message : 'Ошибка парсинга XLSX' }
+  }
+}
+
+export default function ImportDialog({ rows, onConfirm, onCancel }: Props) {
+  const [dragOver, setDragOver] = useState(false)
+  const [parsed, setParsed] = useState<ProductRow[] | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [parseError, setParseError] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const existingArticles = useMemo(() => {
+    const set = new Set<string>()
+    for (const r of rows) {
+      const code = r[EXISTING_ARTICLE]
+      if (code) set.add(code.trim())
+    }
+    return set
+  }, [rows])
+
+  const newRows = useMemo(() => {
+    if (!parsed) return []
+    return parsed.filter(r => {
+      const code = r[EXISTING_ARTICLE]
+      return code && !existingArticles.has(code.trim())
+    })
+  }, [parsed, existingArticles])
+
+  const handleFile = async (file: File) => {
+    setParseError('')
+    setParsed(null)
+    setLoading(true)
+    const ext = file.name.split('.').pop()?.toLowerCase()
+    let result: ParseResult
+    if (ext === 'csv') {
+      result = await parseCSV(file)
+    } else if (ext === 'xlsx' || ext === 'xls') {
+      result = await parseXLSX(file)
+    } else {
+      setParseError('Поддерживаются только CSV и XLSX файлы')
+      setLoading(false)
+      return
+    }
+    if (!result.success) {
+      setParseError(result.error)
+    } else {
+      setParsed(result.rows)
+    }
+    setLoading(false)
+  }
+
+  const onDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setDragOver(false)
+    const file = e.dataTransfer.files[0]
+    if (file) handleFile(file)
+  }
+
+  const onFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) handleFile(file)
+    if (inputRef.current) inputRef.current.value = ''
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onCancel}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>Импорт товаров</h2>
+          <button className="modal-close" onClick={onCancel}>&times;</button>
+        </div>
+
+        <div
+          className={`drop-zone${dragOver ? ' drag-over' : ''}`}
+          onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={onDrop}
+          onClick={() => inputRef.current?.click()}
+        >
+          <p>Перетащите CSV или XLSX файл сюда</p>
+          <p className="hint">или нажмите для выбора файла</p>
+          <input
+            ref={inputRef}
+            type="file"
+            accept=".csv,.xlsx,.xls"
+            hidden
+            onChange={onFileSelect}
+          />
+        </div>
+
+        {loading && <p className="import-status">Парсинг файла...</p>}
+        {parseError && <p className="import-error">{parseError}</p>}
+
+        {parsed && (
+          <div className="import-results">
+            <p className="import-status ok">
+              Загружено строк: {parsed.length}
+            </p>
+            <p className={`import-status ${newRows.length > 0 ? 'new' : 'ok'}`}>
+              Из них новых товаров: {newRows.length}
+            </p>
+
+            {newRows.length > 0 && (
+              <div className="new-products-section">
+                <h3>Новые товары</h3>
+                <div className="new-products-scroll">
+                  <table className="new-products-table">
+                    <thead>
+                      <tr>
+                        <th>Код товара</th>
+                        <th>Наименование</th>
+                        <th>Количество</th>
+                        <th>Бренд</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {newRows.slice(0, 200).map((r, i) => (
+                        <tr key={i}>
+                          <td>{r['Код товара']}</td>
+                          <td>{r['Наименование']}</td>
+                          <td>{r['Количество']}</td>
+                          <td>{r['Бренд']}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {newRows.length > 200 && (
+                    <p className="hint">... и ещё {newRows.length - 200} товаров</p>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="modal-actions">
+          <button className="btn-cancel" onClick={onCancel}>Отмена</button>
+          <button
+            className="btn-confirm"
+            disabled={!parsed || newRows.length === 0}
+            onClick={() => onConfirm(newRows)}
+          >
+            {newRows.length > 0
+              ? `Добавить ${newRows.length} новых товаров`
+              : parsed ? 'Новых товаров нет' : 'Импортировать'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}

@@ -1,10 +1,12 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { fetchJSON, commitJSON, OWNER, REPO } from './github/api'
 import type { ProductRow } from './csv/types'
 import ProductTable from './components/ProductTable'
 import ProductEditor from './components/ProductEditor'
+import ImportDialog from './components/ImportDialog'
 import './App.css'
 
+const IS_DEV = import.meta.env.DEV
 const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || ''
 
 const PASSWORD_EXPIRY_MS = 2 * 24 * 60 * 60 * 1000 // 2 days
@@ -19,7 +21,7 @@ function getSavedPassword(): string | null {
 }
 
 export default function App() {
-  const [unlocked, setUnlocked] = useState(() => !ADMIN_PASSWORD || !!getSavedPassword())
+  const [unlocked, setUnlocked] = useState(() => IS_DEV ? true : (!ADMIN_PASSWORD || !!getSavedPassword()))
   const [passwordInput, setPasswordInput] = useState(getSavedPassword() || '')
   const [passwordError, setPasswordError] = useState(false)
   const [remember, setRemember] = useState(!!getSavedPassword())
@@ -33,9 +35,10 @@ export default function App() {
   const [success, setSuccess] = useState('')
   const [editorRow, setEditorRow] = useState<ProductRow | undefined>(undefined)
   const [editIndex, setEditIndex] = useState<number | null>(null)
+  const [showImport, setShowImport] = useState(false)
 
   const loadData = useCallback(async () => {
-    if (!token) return
+    if (!IS_DEV && !token) return
     setLoading(true)
     setError('')
     setSuccess('')
@@ -52,10 +55,14 @@ export default function App() {
     } finally {
       setLoading(false)
     }
-  }, [token])
+  }, [token, IS_DEV])
+
+  useEffect(() => {
+    if (IS_DEV) loadData()
+  }, [loadData, IS_DEV])
 
   const handleSaveToGitHub = async (updated: ProductRow[]) => {
-    if (!token || !sha) return
+    if (!IS_DEV && (!token || !sha)) return
     setSaving(true)
     setError('')
     setSuccess('')
@@ -96,6 +103,12 @@ export default function App() {
     setEditorRow(undefined)
   }
 
+  const handleImport = (newRows: ProductRow[]) => {
+    setRows(prev => [...prev, ...newRows])
+    setShowImport(false)
+    setSuccess(`Добавлено ${newRows.length} новых товаров`)
+  }
+
   const doUnlock = () => {
     if (passwordInput !== ADMIN_PASSWORD) { setPasswordError(true); return }
     if (remember) {
@@ -130,7 +143,7 @@ export default function App() {
     )
   }
 
-  if (!token) {
+  if (!IS_DEV && !token) {
     return (
       <div className="app">
         <div className="login">
@@ -174,6 +187,13 @@ export default function App() {
             Обновить
           </button>
           <button
+            onClick={() => setShowImport(true)}
+            disabled={loading}
+            className="btn-import"
+          >
+            📥 Импорт
+          </button>
+          <button
             onClick={() => handleSaveToGitHub(rows)}
             disabled={saving || loading || rows.length === 0}
             className="btn-save-github"
@@ -212,6 +232,14 @@ export default function App() {
           }
           onSave={handleEditorSave}
           onCancel={() => setEditorRow(undefined)}
+        />
+      )}
+
+      {showImport && (
+        <ImportDialog
+          rows={rows}
+          onConfirm={handleImport}
+          onCancel={() => setShowImport(false)}
         />
       )}
     </div>

@@ -1,5 +1,7 @@
 const OWNER = import.meta.env.VITE_GITHUB_OWNER || ''
 const REPO = import.meta.env.VITE_GITHUB_REPO || ''
+const IS_DEV = import.meta.env.DEV
+const API_BASE = IS_DEV ? '/github-proxy' : `https://api.github.com`
 
 function decodeUTF8Base64(encoded: string): string {
   const binaryStr = atob(encoded.replace(/\n/g, ''))
@@ -16,15 +18,20 @@ function encodeUTF8Base64(text: string): string {
   return btoa(binary)
 }
 
-export async function fetchJSON(token: string) {
-  const refRes = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/git/ref/heads/main`, {
+export async function fetchJSON(token?: string): Promise<{ content: string; sha: string }> {
+  if (IS_DEV) {
+    const res = await fetch('/api/local/db.json')
+    if (!res.ok) throw new Error('Failed to read local db.json')
+    return { content: await res.text(), sha: '' }
+  }
+  const refRes = await fetch(`${API_BASE}/repos/${OWNER}/${REPO}/git/ref/heads/main`, {
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' },
   })
   if (!refRes.ok) throw new Error('Failed to get repository ref')
   const ref = await refRes.json()
   const commitSha = ref.object.sha as string
 
-  const treeRes = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/git/trees/${commitSha}`, {
+  const treeRes = await fetch(`${API_BASE}/repos/${OWNER}/${REPO}/git/trees/${commitSha}`, {
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' },
   })
   if (!treeRes.ok) throw new Error('Failed to get repository tree')
@@ -33,7 +40,7 @@ export async function fetchJSON(token: string) {
   if (!entry) throw new Error('db.json not found in repository')
   const sha = entry.sha
 
-  const blobRes = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/git/blobs/${sha}`, {
+  const blobRes = await fetch(`${API_BASE}/repos/${OWNER}/${REPO}/git/blobs/${sha}`, {
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' },
   })
   if (!blobRes.ok) throw new Error('Failed to fetch db.json from repository')
@@ -49,8 +56,15 @@ export async function commitJSON(
   sha: string,
   message: string
 ): Promise<void> {
-  const apiUrl = `https://api.github.com/repos/${OWNER}/${REPO}/contents/db.json`
-  const res = await fetch(apiUrl, {
+  if (IS_DEV) {
+    const res = await fetch('/api/local/db.json', {
+      method: 'POST',
+      body: content,
+    })
+    if (!res.ok) throw new Error('Failed to save local db.json')
+    return
+  }
+  const res = await fetch(`${API_BASE}/repos/${OWNER}/${REPO}/contents/db.json`, {
     method: 'PUT',
     headers: {
       Authorization: `Bearer ${token}`,

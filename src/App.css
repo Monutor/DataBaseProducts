@@ -52,6 +52,12 @@ header h1 {
   cursor: not-allowed;
 }
 
+.btn-import {
+  background: #e65100 !important;
+  color: white !important;
+  border-color: #e65100 !important;
+}
+
 .btn-save-github {
   background: #2e7d32 !important;
   color: white !important;
