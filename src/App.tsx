@@ -7,10 +7,22 @@ import './App.css'
 
 const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || ''
 
+const PASSWORD_EXPIRY_MS = 2 * 24 * 60 * 60 * 1000 // 2 days
+
+function getSavedPassword(): string | null {
+  const saved = localStorage.getItem('admin_password')
+  const expires = localStorage.getItem('admin_password_expires')
+  if (saved && expires && Date.now() < Number(expires)) return saved
+  localStorage.removeItem('admin_password')
+  localStorage.removeItem('admin_password_expires')
+  return null
+}
+
 export default function App() {
-  const [unlocked, setUnlocked] = useState(!ADMIN_PASSWORD)
-  const [passwordInput, setPasswordInput] = useState('')
+  const [unlocked, setUnlocked] = useState(() => !ADMIN_PASSWORD || !!getSavedPassword())
+  const [passwordInput, setPasswordInput] = useState(getSavedPassword() || '')
   const [passwordError, setPasswordError] = useState(false)
+  const [remember, setRemember] = useState(!!getSavedPassword())
   const [token, setToken] = useState(() => localStorage.getItem('gh_token') || '')
   const [tokenInput, setTokenInput] = useState(token)
   const [rows, setRows] = useState<ProductRow[]>([])
@@ -84,6 +96,15 @@ export default function App() {
     setEditorRow(undefined)
   }
 
+  const doUnlock = () => {
+    if (passwordInput !== ADMIN_PASSWORD) { setPasswordError(true); return }
+    if (remember) {
+      localStorage.setItem('admin_password', passwordInput)
+      localStorage.setItem('admin_password_expires', String(Date.now() + PASSWORD_EXPIRY_MS))
+    }
+    setUnlocked(true)
+  }
+
   if (!unlocked) {
     return (
       <div className="app">
@@ -94,10 +115,14 @@ export default function App() {
             placeholder="Пароль администратора"
             value={passwordInput}
             onChange={e => { setPasswordInput(e.target.value); setPasswordError(false) }}
-            onKeyDown={e => { if (e.key === 'Enter' && passwordInput === ADMIN_PASSWORD) setUnlocked(true); else if (e.key === 'Enter') setPasswordError(true) }}
+            onKeyDown={e => { if (e.key === 'Enter') doUnlock() }}
           />
           {passwordError && <p className="hint" style={{ color: '#c62828' }}>Неверный пароль</p>}
-          <button onClick={() => { if (passwordInput === ADMIN_PASSWORD) setUnlocked(true); else setPasswordError(true) }}>
+          <label className="remember-row">
+            <input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)} />
+            Запомнить пароль на 2 дня
+          </label>
+          <button onClick={doUnlock}>
             Войти
           </button>
         </div>

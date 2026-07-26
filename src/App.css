@@ -146,3 +146,19 @@ header h1 {
   font-size: 11px;
   color: #999;
 }
+
+.remember-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #666;
+  cursor: pointer;
+  justify-content: center;
+}
+
+.remember-row input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
