@@ -149,7 +149,7 @@ export default function App() {
         <div className="login">
           <h1>Admin Panel</h1>
           <p className="repo-label">
-            Репозиторий: {OWNER}/{REPO}
+            База данных товаров магазина S187
           </p>
           <input
             type="password"
@@ -177,7 +177,7 @@ export default function App() {
     <div className="app">
       <header>
         <h1>
-          {OWNER}/{REPO}
+          База данных товаров магазина S187
         </h1>
         <div className="header-actions">
           {success && <span className="status ok">{success}</span>}
