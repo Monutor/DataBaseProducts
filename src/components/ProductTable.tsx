@@ -18,9 +18,12 @@ export default function ProductTable({ rows, onEdit, onAdd }: Props) {
 
   const filtered = useMemo(() => {
     if (!search.trim()) return rows
-    const q = search.toLowerCase()
+    const terms = search.split(',').map(t => t.trim().toLowerCase()).filter(Boolean)
+    if (terms.length === 0) return rows
     return rows.filter(r =>
-      Object.values(r).some(v => v?.toLowerCase().includes(q))
+      terms.some(term =>
+        Object.values(r).some(v => String(v || '').toLowerCase().includes(term))
+      )
     )
   }, [rows, search])
 
