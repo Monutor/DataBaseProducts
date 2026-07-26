@@ -1,7 +1,5 @@
 import { useState, useCallback } from 'react'
-import { fetchCSV, commitCSV, OWNER, REPO } from './github/api'
-import { parseCSV } from './csv/parse'
-import { serializeCSV } from './csv/serialize'
+import { fetchJSON, commitJSON, OWNER, REPO } from './github/api'
 import type { ProductRow } from './csv/types'
 import ProductTable from './components/ProductTable'
 import ProductEditor from './components/ProductEditor'
@@ -30,8 +28,8 @@ export default function App() {
     setError('')
     setSuccess('')
     try {
-      const { content, sha: fileSha } = await fetchCSV(token)
-      setRows(parseCSV(content))
+      const { content, sha: fileSha } = await fetchJSON(token)
+      setRows(JSON.parse(content))
       setSha(fileSha)
       setSuccess('Данные загружены')
     } catch (e: unknown) {
@@ -50,11 +48,10 @@ export default function App() {
     setError('')
     setSuccess('')
     try {
-      const csv = serializeCSV(updated)
-      await commitCSV(token, csv, sha, '[Admin] Обновление базы товаров')
+      await commitJSON(token, JSON.stringify(updated, null, 2), sha, '[Admin] Обновление базы товаров')
       setSuccess('Изменения сохранены в GitHub!')
-      const result = await fetchCSV(token)
-      setRows(parseCSV(result.content))
+      const result = await fetchJSON(token)
+      setRows(JSON.parse(result.content))
       setSha(result.sha)
     } catch (e: unknown) {
       setError(

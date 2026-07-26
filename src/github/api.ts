@@ -1,19 +1,13 @@
-import { Octokit } from 'octokit'
-
 const OWNER = import.meta.env.VITE_GITHUB_OWNER || ''
 const REPO = import.meta.env.VITE_GITHUB_REPO || ''
 
-function createClient(token: string) {
-  return new Octokit({ auth: token })
-}
-
-function decodeBase64Content(encoded: string): string {
+function decodeUTF8Base64(encoded: string): string {
   const binaryStr = atob(encoded.replace(/\n/g, ''))
   const bytes = Uint8Array.from(binaryStr, c => c.charCodeAt(0))
-  return new TextDecoder('windows-1251').decode(bytes)
+  return new TextDecoder('utf-8').decode(bytes)
 }
 
-function encodeToBase64(text: string): string {
+function encodeUTF8Base64(text: string): string {
   const bytes = new TextEncoder().encode(text)
   let binary = ''
   for (let i = 0; i < bytes.length; i++) {
@@ -22,42 +16,48 @@ function encodeToBase64(text: string): string {
   return btoa(binary)
 }
 
-export async function fetchCSV(token: string) {
-  const apiUrl = `https://api.github.com/repos/${OWNER}/${REPO}/contents/db.csv`
+export async function fetchJSON(token: string) {
+  const apiUrl = `https://api.github.com/repos/${OWNER}/${REPO}/contents/db.json`
 
   const metaRes = await fetch(apiUrl, {
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' },
   })
-  if (!metaRes.ok) throw new Error('db.csv not found in repository')
+  if (!metaRes.ok) throw new Error('db.json not found in repository')
   const meta = await metaRes.json()
   const sha = (meta as { sha?: string }).sha
-  if (!sha) throw new Error('db.csv not found in repository')
+  if (!sha) throw new Error('db.json not found in repository')
 
   const blobRes = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/git/blobs/${sha}`, {
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' },
   })
-  if (!blobRes.ok) throw new Error('Failed to fetch db.csv from repository')
+  if (!blobRes.ok) throw new Error('Failed to fetch db.json from repository')
   const blob = await blobRes.json()
-  const raw = blob.encoding === 'base64' ? decodeBase64Content(blob.content as string) : (blob.content as string)
+  const raw = blob.encoding === 'base64' ? decodeUTF8Base64(blob.content as string) : (blob.content as string)
 
   return { content: raw as string, sha }
 }
 
-export async function commitCSV(
+export async function commitJSON(
   token: string,
   content: string,
   sha: string,
   message: string
 ): Promise<void> {
-  const octokit = createClient(token)
-  await octokit.rest.repos.createOrUpdateFileContents({
-    owner: OWNER,
-    repo: REPO,
-    path: 'db.csv',
-    message,
-    content: encodeToBase64(content),
-    sha,
+  const apiUrl = `https://api.github.com/repos/${OWNER}/${REPO}/contents/db.json`
+  const res = await fetch(apiUrl, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/vnd.github+json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      message,
+      content: encodeUTF8Base64(content),
+      sha,
+    }),
   })
+  if (!res.ok) throw new Error('Failed to save db.json: ' + (await res.text()))
 }
 
 export { OWNER, REPO }
