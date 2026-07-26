@@ -18,11 +18,11 @@ function encodeUTF8Base64(text: string): string {
   return btoa(binary)
 }
 
-export async function fetchJSON(token?: string): Promise<{ content: string; sha: string }> {
+export async function fetchJSON(token?: string): Promise<{ content: string; sha: string; date: string }> {
   if (IS_DEV) {
     const res = await fetch('/api/local/db.json')
     if (!res.ok) throw new Error('Failed to read local db.json')
-    return { content: await res.text(), sha: '' }
+    return { content: await res.text(), sha: '', date: '' }
   }
   const refRes = await fetch(`${API_BASE}/repos/${OWNER}/${REPO}/git/ref/heads/main`, {
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' },
@@ -47,7 +47,16 @@ export async function fetchJSON(token?: string): Promise<{ content: string; sha:
   const blob = await blobRes.json()
   const raw = blob.encoding === 'base64' ? decodeUTF8Base64(blob.content as string) : (blob.content as string)
 
-  return { content: raw as string, sha }
+  const commitRes = await fetch(`${API_BASE}/repos/${OWNER}/${REPO}/git/commits/${commitSha}`, {
+    headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' },
+  })
+  let date = ''
+  if (commitRes.ok) {
+    const commit = await commitRes.json()
+    date = (commit.committer?.date as string) || ''
+  }
+
+  return { content: raw as string, sha, date }
 }
 
 export async function commitJSON(

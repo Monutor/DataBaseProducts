@@ -351,3 +351,97 @@ header h1 {
 .btn-confirm:hover {
   background: #1b5e20;
 }
+
+.btn-history {
+  background: #f57c00 !important;
+  color: white !important;
+  border-color: #f57c00 !important;
+}
+
+.btn-history:hover:not(:disabled) {
+  background: #ef6c00 !important;
+}
+
+.btn-danger {
+  background: #c62828 !important;
+  color: white !important;
+  border: none !important;
+}
+
+.btn-danger:hover {
+  background: #b71c1c !important;
+}
+
+.import-history-content {
+  padding: 16px 20px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.import-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.import-history-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: #f5f5f5;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.import-history-item:hover {
+  background: #eeeeee;
+}
+
+.source-badge {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.source-file {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+
+.source-sew {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.history-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.history-row-count {
+  font-weight: 600;
+  color: #333;
+}
+
+.history-time {
+  font-size: 11px;
+  color: #888;
+}
+
+.import-history-modal {
+  max-width: 500px;
+}
+
+.app-footer {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #ddd;
+  text-align: center;
+  font-size: 12px;
+  color: #888;
+}

@@ -6,6 +6,45 @@ import ProductEditor from './components/ProductEditor'
 import ImportDialog from './components/ImportDialog'
 import './App.css'
 
+interface ImportHistoryEntry {
+  id: string
+  timestamp: number
+  source: 'file' | 'sew'
+  rowCount: number
+}
+
+const HISTORY_STORAGE_KEY = 'import_history'
+
+function loadImportHistory(): ImportHistoryEntry[] {
+  try {
+    const raw = localStorage.getItem(HISTORY_STORAGE_KEY)
+    if (!raw) return []
+    return JSON.parse(raw) as ImportHistoryEntry[]
+  } catch {
+    return []
+  }
+}
+
+function saveImportHistory(history: ImportHistoryEntry[]) {
+  localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(history))
+}
+
+function addImportEntry(source: 'file' | 'sew', rowCount: number) {
+  const history = loadImportHistory()
+  history.unshift({
+    id: crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    timestamp: Date.now(),
+    source,
+    rowCount,
+  })
+  saveImportHistory(history)
+}
+
+function formatTimestamp(ts: number): string {
+  const d = new Date(ts)
+  return d.toLocaleDateString('ru-RU') + ' ' + d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+}
+
 const IS_DEV = import.meta.env.DEV
 const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || ''
 
@@ -30,6 +69,7 @@ export default function App() {
   const [tokenInput, setTokenInput] = useState(token)
   const [rows, setRows] = useState<ProductRow[]>([])
   const [sha, setSha] = useState('')
+  const [lastUpdatedDate, setLastUpdatedDate] = useState('')
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -39,6 +79,8 @@ export default function App() {
   const [showImport, setShowImport] = useState(false)
   const [sewLoading, setSewLoading] = useState(false)
   const [sewPreviewRows, setSewPreviewRows] = useState<ProductRow[]>([])
+  const [showImportHistory, setShowImportHistory] = useState(false)
+  const [importHistory, setImportHistory] = useState<ImportHistoryEntry[]>(loadImportHistory)
 
   const loadData = useCallback(async () => {
     if (!IS_DEV && !token) return
@@ -46,9 +88,10 @@ export default function App() {
     setError('')
     setSuccess('')
     try {
-      const { content, sha: fileSha } = await fetchJSON(token)
+      const { content, sha: fileSha, date } = await fetchJSON(token)
       setRows(JSON.parse(content))
       setSha(fileSha)
+      if (date) setLastUpdatedDate(date)
       setSuccess('Данные загружены')
     } catch (e: unknown) {
       setError(
@@ -79,6 +122,7 @@ export default function App() {
       const result = await fetchJSON(token)
       setRows(JSON.parse(result.content))
       setSha(result.sha)
+      if (result.date) setLastUpdatedDate(result.date)
     } catch (e: unknown) {
       setError(
         'Ошибка сохранения: ' +
@@ -110,7 +154,9 @@ export default function App() {
     setEditorRow(undefined)
   }
 
-  const handleImport = (newRows: ProductRow[]) => {
+  const handleImport = (newRows: ProductRow[], source: 'file' | 'sew' = 'file') => {
+    addImportEntry(source, newRows.length)
+    setImportHistory(loadImportHistory())
     setRows(prev => [...prev, ...newRows])
     setShowImport(false)
     setSuccess(`Добавлено ${newRows.length} новых товаров`)
@@ -255,6 +301,13 @@ export default function App() {
           >
             {sewLoading ? '⏳' : '📥'} Загрузить с SEW
           </button>
+          <button
+            onClick={() => setShowImportHistory(true)}
+            className="btn-history"
+            title="История импортов"
+          >
+            📋 История
+          </button>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             {sewToken ? (
               <>
@@ -360,8 +413,11 @@ export default function App() {
                 <button
                   className="btn-confirm"
                   onClick={() => {
-                    handleImport(sewPreviewRows)
+                    addImportEntry('sew', sewPreviewRows.length)
+                    setImportHistory(loadImportHistory())
+                    setRows(prev => [...prev, ...sewPreviewRows])
                     setSewPreviewRows([])
+                    setSuccess(`Добавлено ${sewPreviewRows.length} новых товаров`)
                   }}
                 >
                   Добавить {sewPreviewRows.length} новых товаров
@@ -371,6 +427,77 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {showImportHistory && (
+        <div className="modal-overlay" onClick={() => setShowImportHistory(false)}>
+          <div className="modal import-history-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>История импортов</h2>
+              <button className="modal-close" onClick={() => setShowImportHistory(false)}>&times;</button>
+            </div>
+
+            <div className="import-history-content">
+              {importHistory.length === 0 ? (
+                <p className="hint" style={{ textAlign: 'center', padding: '20px' }}>История пуста</p>
+              ) : (
+                <>
+                  <p className="hint" style={{ marginBottom: '12px' }}>Всего записей: {importHistory.length}</p>
+                  <div className="import-history-list">
+                    {importHistory.map(entry => (
+                      <div key={entry.id} className="import-history-item">
+                        <div className="history-source">
+                          <span className={`source-badge source-${entry.source}`}>
+                            {entry.source === 'file' ? '📁 Файл' : '🌐 SEW'}
+                          </span>
+                        </div>
+                        <div className="history-details">
+                          <span className="history-row-count">{entry.rowCount} {declension(entry.rowCount, ['товар', 'товара', 'товаров'])}</span>
+                          <span className="history-time">{formatTimestamp(entry.timestamp)}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="modal-actions">
+              <button
+                className="btn-danger"
+                onClick={() => {
+                  if (window.confirm('Очистить всю историю импортов?')) {
+                    localStorage.removeItem(HISTORY_STORAGE_KEY)
+                    setImportHistory([])
+                  }
+                }}
+              >
+                Очистить
+              </button>
+              <button className="btn-cancel" onClick={() => setShowImportHistory(false)}>Закрыть</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <footer className="app-footer">
+        {lastUpdatedDate && (
+          <span>База обновлена: {formatISODate(lastUpdatedDate)}</span>
+        )}
+      </footer>
     </div>
   )
+}
+
+function declension(n: number, forms: [string, string, string]): string {
+  const abs = Math.abs(n) % 100
+  const lastDigit = abs % 10
+  if (abs > 10 && abs < 20) return forms[2]
+  if (lastDigit === 1) return forms[0]
+  if (lastDigit >= 2 && lastDigit <= 4) return forms[1]
+  return forms[2]
+}
+
+function formatISODate(iso: string): string {
+  const d = new Date(iso)
+  return d.toLocaleDateString('ru-RU') + ' ' + d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
 }
