@@ -1,0 +1,10 @@
+- generic [ref=f6e3]:
+  - banner [ref=f6e8]:
+    - heading "Monutor/DataBaseProducts" [level=1] [ref=f6e9]
+    - generic [ref=f6e10]:
+      - button "Обновить" [ref=f6e11] [cursor=pointer]
+      - button "💾 Сохранить в GitHub" [disabled] [ref=f6e12]
+      - button "Выйти" [ref=f6e13] [cursor=pointer]
+  - generic [ref=f6e14]:
+    - paragraph [ref=f6e15]: Нажмите «Обновить» для загрузки данных из репозитория.
+    - button "Обновить" [ref=f6e16] [cursor=pointer]

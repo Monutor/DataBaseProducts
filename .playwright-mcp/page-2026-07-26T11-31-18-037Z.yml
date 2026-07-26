@@ -1,0 +1,11 @@
+- generic [ref=f6e3]:
+  - banner [ref=f6e8]:
+    - heading "Monutor/DataBaseProducts" [level=1] [ref=f6e9]
+    - generic [ref=f6e10]:
+      - button "Обновить" [ref=f6e11] [cursor=pointer]
+      - button "💾 Сохранить в GitHub" [disabled] [ref=f6e12]
+      - button "Выйти" [ref=f6e13] [cursor=pointer]
+  - generic [ref=f6e17]: "Ошибка загрузки: Failed to fetch"
+  - generic [ref=f6e18]:
+    - paragraph [ref=f6e19]: Нажмите «Обновить» для загрузки данных из репозитория.
+    - button "Обновить" [ref=f6e20] [cursor=pointer]

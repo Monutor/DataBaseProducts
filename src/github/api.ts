@@ -8,20 +8,21 @@ function createClient(token: string) {
 }
 
 export async function fetchCSV(token: string) {
-  const octokit = createClient(token)
+  const apiUrl = `https://api.github.com/repos/${OWNER}/${REPO}/contents/db.csv`
 
-  const meta = await octokit.rest.repos.getContent({
-    owner: OWNER,
-    repo: REPO,
-    path: 'db.csv',
+  const metaRes = await fetch(apiUrl, {
+    headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' },
   })
-  const sha = (meta.data as { sha?: string }).sha
+  if (!metaRes.ok) throw new Error('db.csv not found in repository')
+  const meta = await metaRes.json()
+  const sha = (meta as { sha?: string }).sha
   if (!sha) throw new Error('db.csv not found in repository')
 
-  const rawUrl = `https://raw.githubusercontent.com/${OWNER}/${REPO}/main/db.csv`
-  const raw = await fetch(rawUrl, { headers: { Authorization: `Bearer ${token}` } })
-  if (!raw.ok) throw new Error('Failed to fetch db.csv from repository')
-  const content = await raw.text()
+  const rawRes = await fetch(apiUrl, {
+    headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github.raw' },
+  })
+  if (!rawRes.ok) throw new Error('Failed to fetch db.csv from repository')
+  const content = await rawRes.text()
 
   return { content, sha }
 }
