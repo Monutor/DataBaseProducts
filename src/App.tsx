@@ -26,6 +26,7 @@ export default function App() {
   const [passwordError, setPasswordError] = useState(false)
   const [remember, setRemember] = useState(!!getSavedPassword())
   const [token, setToken] = useState(() => localStorage.getItem('gh_token') || '')
+  const [sewToken, setSewTokenState] = useState(() => localStorage.getItem('sew_token') || '')
   const [tokenInput, setTokenInput] = useState(token)
   const [rows, setRows] = useState<ProductRow[]>([])
   const [sha, setSha] = useState('')
@@ -213,6 +214,26 @@ export default function App() {
           >
             Выйти
           </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {sewToken ? (
+              <>
+                <span title="SEW токен установлен" style={{ fontSize: '12px', color: '#4caf50' }}>SEW OK</span>
+                <button onClick={() => { setSewTokenState(''); localStorage.removeItem('sew_token') }} className="btn-clear-token">
+                  ✕
+                </button>
+              </>
+            ) : (
+              <input
+                type="password"
+                placeholder="SEW Token"
+                value={sewToken}
+                onChange={e => setSewTokenState(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') localStorage.setItem('sew_token', sewToken) }}
+                className="sew-token-input"
+                style={{ width: '140px' }}
+              />
+            )}
+          </div>
         </div>
       </header>
 

@@ -168,3 +168,32 @@ header h1 {
   height: 16px;
   cursor: pointer;
 }
+
+.sew-token-input {
+  padding: 6px 10px;
+  border: 1px solid #555;
+  border-radius: 4px;
+  background: #2d2d30;
+  color: #ccc;
+  font-size: 13px;
+}
+
+.sew-token-input:focus {
+  outline: none;
+  border-color: #007acc;
+}
+
+.btn-clear-token {
+  padding: 4px 8px;
+  background: transparent;
+  border: 1px solid #666;
+  color: #999;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.btn-clear-token:hover {
+  background: #3d3d40;
+  color: #fff;
+}
