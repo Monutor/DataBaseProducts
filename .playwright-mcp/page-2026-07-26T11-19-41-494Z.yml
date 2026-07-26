@@ -1,4 +1,0 @@
-- generic [ref=f1e4]:
-  - heading "Admin Panel" [level=1] [ref=f1e5]
-  - textbox "Пароль администратора" [ref=f1e6]
-  - button "Войти" [ref=f1e7] [cursor=pointer]

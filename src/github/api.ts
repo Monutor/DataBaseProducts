@@ -7,6 +7,21 @@ function createClient(token: string) {
   return new Octokit({ auth: token })
 }
 
+function decodeBase64Content(encoded: string): string {
+  const binaryStr = atob(encoded.replace(/\n/g, ''))
+  const bytes = Uint8Array.from(binaryStr, c => c.charCodeAt(0))
+  return new TextDecoder('windows-1251').decode(bytes)
+}
+
+function encodeToBase64(text: string): string {
+  const bytes = new TextEncoder().encode(text)
+  let binary = ''
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i])
+  }
+  return btoa(binary)
+}
+
 export async function fetchCSV(token: string) {
   const apiUrl = `https://api.github.com/repos/${OWNER}/${REPO}/contents/db.csv`
 
@@ -23,7 +38,7 @@ export async function fetchCSV(token: string) {
   })
   if (!blobRes.ok) throw new Error('Failed to fetch db.csv from repository')
   const blob = await blobRes.json()
-  const raw = blob.encoding === 'base64' ? atob((blob.content as string).replace(/\n/g, '')) : (blob.content as string)
+  const raw = blob.encoding === 'base64' ? decodeBase64Content(blob.content as string) : (blob.content as string)
 
   return { content: raw as string, sha }
 }
@@ -40,7 +55,7 @@ export async function commitCSV(
     repo: REPO,
     path: 'db.csv',
     message,
-    content: btoa(content),
+    content: encodeToBase64(content),
     sha,
   })
 }
