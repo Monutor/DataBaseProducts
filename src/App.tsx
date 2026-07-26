@@ -37,6 +37,8 @@ export default function App() {
   const [editorRow, setEditorRow] = useState<ProductRow | undefined>(undefined)
   const [editIndex, setEditIndex] = useState<number | null>(null)
   const [showImport, setShowImport] = useState(false)
+  const [sewLoading, setSewLoading] = useState(false)
+  const [sewPreviewRows, setSewPreviewRows] = useState<ProductRow[]>([])
 
   const loadData = useCallback(async () => {
     if (!IS_DEV && !token) return
@@ -112,6 +114,37 @@ export default function App() {
     setRows(prev => [...prev, ...newRows])
     setShowImport(false)
     setSuccess(`Добавлено ${newRows.length} новых товаров`)
+  }
+
+  const handleSEWLoad = async () => {
+    if (!sewToken.trim()) return
+    
+    setSewLoading(true)
+    setSewPreviewRows([])
+
+    const { fetchFromSEW } = await import('./shared/parser')
+    const result = await fetchFromSEW(sewToken.trim())
+
+    if (!result.success) {
+      setError(result.error)
+      setSewLoading(false)
+      return
+    }
+
+    const existingArticles = new Set(rows.map(r => r['Код товара']?.trim()).filter(Boolean))
+    const newRows = result.rows.filter((r: ProductRow) => {
+      const code = r['Код товара']?.trim()
+      return code && !existingArticles.has(code)
+    })
+
+    if (newRows.length === 0) {
+      setError('Новых товаров не найдено. Все товары уже в базе.')
+      setSewLoading(false)
+      return
+    }
+
+    setSewPreviewRows(newRows)
+    setSewLoading(false)
   }
 
   const doUnlock = () => {
@@ -214,6 +247,14 @@ export default function App() {
           >
             Выйти
           </button>
+          <button
+            onClick={handleSEWLoad}
+            disabled={sewLoading || !sewToken.trim()}
+            className="btn-sew-load"
+            title="Загрузить данные с SEW API"
+          >
+            {sewLoading ? '⏳' : '📥'} Загрузить с SEW
+          </button>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             {sewToken ? (
               <>
@@ -237,7 +278,7 @@ export default function App() {
         </div>
       </header>
 
-      {error && <div className="error">{error}</div>}
+      {error && sewPreviewRows.length === 0 && <div className="error">{error}</div>}
 
       {rows.length > 0 ? (
         <ProductTable rows={rows} onEdit={handleEdit} onAdd={handleAdd} />
@@ -266,6 +307,63 @@ export default function App() {
           onConfirm={handleImport}
           onCancel={() => setShowImport(false)}
         />
+      )}
+
+      {sewPreviewRows.length > 0 && (
+        <div className="modal-overlay" onClick={() => setSewPreviewRows([])}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Новые товары из SEW</h2>
+              <button className="modal-close" onClick={() => setSewPreviewRows([])}>&times;</button>
+            </div>
+
+            <div className="import-results">
+              <p className="import-status new">Найдено новых товаров: {sewPreviewRows.length}</p>
+
+              <div className="new-products-section">
+                <h3>Новые товары</h3>
+                <div className="new-products-scroll">
+                  <table className="new-products-table">
+                    <thead>
+                      <tr>
+                        <th>Код товара</th>
+                        <th>Наименование</th>
+                        <th>Количество</th>
+                        <th>Бренд</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sewPreviewRows.slice(0, 200).map((r, i) => (
+                        <tr key={i}>
+                          <td>{r['Код товара']}</td>
+                          <td>{r['Наименование']}</td>
+                          <td>{r['Количество']}</td>
+                          <td>{r['Бренд']}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {sewPreviewRows.length > 200 && (
+                    <p className="hint">... и ещё {sewPreviewRows.length - 200} товаров</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="modal-actions">
+                <button className="btn-cancel" onClick={() => setSewPreviewRows([])}>Отмена</button>
+                <button
+                  className="btn-confirm"
+                  onClick={() => {
+                    handleImport(sewPreviewRows)
+                    setSewPreviewRows([])
+                  }}
+                >
+                  Добавить {sewPreviewRows.length} новых товаров
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
