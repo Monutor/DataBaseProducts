@@ -1,8 +1,7 @@
 import { useState, useRef, useMemo } from 'react'
-import Papa from 'papaparse'
-import * as XLSX from 'xlsx'
 import type { ProductRow } from '../csv/types'
 import './ImportDialog.css'
+import type { ParseResult } from '../shared/parser'
 
 interface Props {
   rows: ProductRow[]
@@ -19,85 +18,6 @@ function readFileAsBuffer(file: File): Promise<ArrayBuffer> {
     reader.onerror = () => reject(new Error('Failed to read file'))
     reader.readAsArrayBuffer(file)
   })
-}
-
-const PRODUCT_ROW_KEYS: (keyof ProductRow)[] = [
-  'Магазин', 'Зона', 'Ячейки хранения', 'ШК ячейки хранения', 'Код товара',
-  'Наименование', 'Количество', 'Тип', 'Этикетка', 'Группа 5', 'Группа 4',
-  'Группа 3', 'Группа 2', 'Группа 1', 'Бренд', 'ШК товара', 'Компонент',
-  'STOPSALE', 'ONLINE-ONLY', 'Маркетплейс', 'Маркированный', 'Время создания МСК',
-  'Последнее изменение МСК',
-]
-
-function parseToProductRows(data: Record<string, string>[]): ProductRow[] {
-  const sampleKeys = Object.keys(data[0] || {})
-  const keyMap: Record<string, keyof ProductRow> = {}
-  for (const k of PRODUCT_ROW_KEYS) {
-    const match = sampleKeys.find(s => s.trim() === k.trim())
-    if (match) keyMap[match] = k
-  }
-  return data.map(row => {
-    const out: ProductRow = {} as ProductRow
-    for (const destKey of PRODUCT_ROW_KEYS) {
-      ;(out as any)[destKey] = ''
-    }
-    for (const [srcKey, destKey] of Object.entries(keyMap)) {
-      const val = row[srcKey]
-      ;(out as any)[destKey] = val != null ? String(val) : ''
-    }
-    return out
-  })
-}
-
-type ParseResult = {
-  success: true
-  rows: ProductRow[]
-} | {
-  success: false
-  error: string
-}
-
-async function parseCSV(file: File): Promise<ParseResult> {
-  const text = await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(reader.result as string)
-    reader.onerror = () => reject(new Error('Failed to read file'))
-    reader.readAsText(file, 'utf-8')
-  })
-  return new Promise(resolve => {
-    Papa.parse(text, {
-      header: true,
-      skipEmptyLines: true,
-      encoding: 'UTF-8',
-      complete(results) {
-        if (results.errors.length > 0) {
-          resolve({ success: false, error: results.errors[0].message })
-          return
-        }
-        const rows = parseToProductRows(results.data as Record<string, string>[])
-        resolve({ success: true, rows })
-      },
-      error(err: Error) {
-        resolve({ success: false, error: err.message })
-      },
-    })
-  })
-}
-
-async function parseXLSX(file: File): Promise<ParseResult> {
-  try {
-    const buffer = await readFileAsBuffer(file)
-    const workbook = XLSX.read(buffer, { type: 'array', cellDates: false, cellText: true, cellNF: false, WTF: false })
-    const sheetName = workbook.SheetNames[0]
-    if (!sheetName) return { success: false, error: 'Файл не содержит листов' }
-    const sheet = workbook.Sheets[sheetName]
-    const data = XLSX.utils.sheet_to_json<Record<string, string>>(sheet, { defval: '', raw: true })
-    if (data.length === 0) return { success: false, error: 'Файл не содержит данных' }
-    const rows = parseToProductRows(data)
-    return { success: true, rows }
-  } catch (e: unknown) {
-    return { success: false, error: e instanceof Error ? e.message : 'Ошибка парсинга XLSX' }
-  }
 }
 
 export default function ImportDialog({ rows, onConfirm, onCancel }: Props) {
@@ -131,9 +51,16 @@ export default function ImportDialog({ rows, onConfirm, onCancel }: Props) {
     const ext = file.name.split('.').pop()?.toLowerCase()
     let result: ParseResult
     if (ext === 'csv') {
-      result = await parseCSV(file)
+      const text = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result as string)
+        reader.onerror = () => reject(new Error('Failed to read file'))
+        reader.readAsText(file, 'utf-8')
+      })
+      result = await (await import('../shared/parser')).parseCSV(text)
     } else if (ext === 'xlsx' || ext === 'xls') {
-      result = await parseXLSX(file)
+      const buffer = await readFileAsBuffer(file)
+      result = await (await import('../shared/parser')).parseXLSX(buffer)
     } else {
       setParseError('Поддерживаются только CSV и XLSX файлы')
       setLoading(false)
