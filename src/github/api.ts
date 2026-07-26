@@ -18,13 +18,14 @@ export async function fetchCSV(token: string) {
   const sha = (meta as { sha?: string }).sha
   if (!sha) throw new Error('db.csv not found in repository')
 
-  const rawRes = await fetch(apiUrl, {
-    headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github.raw' },
+  const blobRes = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/git/blobs/${sha}`, {
+    headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' },
   })
-  if (!rawRes.ok) throw new Error('Failed to fetch db.csv from repository')
-  const content = await rawRes.text()
+  if (!blobRes.ok) throw new Error('Failed to fetch db.csv from repository')
+  const blob = await blobRes.json()
+  const raw = blob.encoding === 'base64' ? atob((blob.content as string).replace(/\n/g, '')) : (blob.content as string)
 
-  return { content, sha }
+  return { content: raw as string, sha }
 }
 
 export async function commitCSV(
