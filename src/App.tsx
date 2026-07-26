@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
-import { fetchJSON, commitJSON, OWNER, REPO } from './github/api'
+import { fetchJSON, commitJSON } from './github/api'
 import type { ProductRow } from './csv/types'
 import ProductTable from './components/ProductTable'
 import ProductEditor from './components/ProductEditor'
