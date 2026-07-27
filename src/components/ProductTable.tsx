@@ -4,8 +4,8 @@ import './ProductTable.css'
 
 interface Props {
   rows: ProductRow[]
-  onEdit: (index: number, row: ProductRow) => void
-  onAdd: () => void
+  onEdit?: (index: number, row: ProductRow) => void
+  onAdd?: () => void
 }
 
 const PAGE_SIZE = 100
@@ -64,9 +64,11 @@ export default function ProductTable({ rows, onEdit, onAdd }: Props) {
           onChange={e => { setSearch(e.target.value); setPage(1) }}
           className="search-input"
         />
-        <button onClick={onAdd} className="btn-add">
-          + Добавить товар
-        </button>
+        {onAdd && (
+          <button onClick={onAdd} className="btn-add">
+            + Добавить товар
+          </button>
+        )}
       </div>
       <div className="table-scroll">
         <table>
@@ -82,7 +84,7 @@ export default function ProductTable({ rows, onEdit, onAdd }: Props) {
                   {sortKey === key ? (sortDir === 'asc' ? '▲' : '▼') : ''}
                 </th>
               ))}
-              <th>Действия</th>
+              {onEdit && <th>Действия</th>}
             </tr>
           </thead>
           <tbody>
@@ -93,15 +95,17 @@ export default function ProductTable({ rows, onEdit, onAdd }: Props) {
                 {headers.map(h => (
                   <td key={h}>{row[h as keyof ProductRow]}</td>
                 ))}
-                <td>
-                  <button
-                    className="btn-edit"
-                    onClick={() => onEdit(realIndex, row)}
-                    title="Редактировать"
-                  >
-                    ✏️
-                  </button>
-                </td>
+                {onEdit && (
+                  <td>
+                    <button
+                      className="btn-edit"
+                      onClick={() => onEdit(realIndex, row)}
+                      title="Редактировать"
+                    >
+                      ✏️
+                    </button>
+                  </td>
+                )}
               </tr>
               )
             })}
