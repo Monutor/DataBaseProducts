@@ -82,7 +82,7 @@ export default function App() {
   const [sewLoading, setSewLoading] = useState(false)
   const [sewPreviewRows, setSewPreviewRows] = useState<ProductRow[]>([])
   const [showImportHistory, setShowImportHistory] = useState(false)
-  const [importHistory, setImportHistory] = useState<ImportHistoryEntry[]>(loadImportHistory)
+  const [importHistory, setImportHistory] = useState<ImportHistoryEntry[]>(loadImportHistory())
 
   const loadPublicData = useCallback(async () => {
     setLoading(true)
@@ -120,7 +120,10 @@ export default function App() {
   useEffect(() => { loadPublicData() }, [loadPublicData])
 
   const handleSaveToGitHub = async (updated: ProductRow[]) => {
-    if (!ghToken || !sha) return
+    if (!ghToken || !sha) {
+      if (!sha) setError('Загрузите данные перед сохранением (нажмите Обновить в админ-режиме)')
+      return
+    }
     setSaving(true)
     setError('')
     setSuccess('')
@@ -290,13 +293,34 @@ export default function App() {
       {sewPreviewRows.length > 0 && (
         <div className="modal-overlay" onClick={() => setSewPreviewRows([])}>
           <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-header"><h2>Новые товары из SEW</h2><button className="modal-close" onClick={() => setSewPreviewRows([])}>&times;</button></div>
+            <div className="modal-header">
+              <h2>Новые товары из SEW</h2>
+              <button className="modal-close" onClick={() => setSewPreviewRows([])}>&times;</button>
+            </div>
             <div className="import-results">
               <p className="import-status new">Найдено новых товаров: {sewPreviewRows.length}</p>
-              <div className="new-products-section"><h3>Новые товары</h3>
+              <div className="new-products-section">
+                <h3>Новые товары</h3>
                 <div className="new-products-scroll">
-                  <table className="new-products-table"><thead><tr><th>Код товара</th><th>Наименование</th><th>Количество</th><th>Бренд</th></tr></thead>
-                    <tbody>{sewPreviewRows.slice(0,200).map((r,i) => (<tr key={i}><td>{r['Код товара']}</td><td>{r['Наименование']}</td><td>{r['Количество']}</td><td>{r['Бренд']}</td></tr>))}</tbody>
+                  <table className="new-products-table">
+                    <thead>
+                      <tr>
+                        <th>Код товара</th>
+                        <th>Наименование</th>
+                        <th>Количество</th>
+                        <th>Бренд</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sewPreviewRows.slice(0,200).map((r,i) => (
+                        <tr key={i}>
+                          <td>{r['Код товара']}</td>
+                          <td>{r['Наименование']}</td>
+                          <td>{r['Количество']}</td>
+                          <td>{r['Бренд']}</td>
+                        </tr>
+                      ))}
+                    </tbody>
                   </table>
                   {sewPreviewRows.length > 200 && <p className="hint">... и ещё {sewPreviewRows.length - 200} товаров</p>}
                 </div>
@@ -325,17 +349,31 @@ export default function App() {
       {showImportHistory && (
         <div className="modal-overlay" onClick={() => setShowImportHistory(false)}>
           <div className="modal import-history-modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-header"><h2>История импортов</h2><button className="modal-close" onClick={() => setShowImportHistory(false)}>&times;</button></div>
+            <div className="modal-header">
+              <h2>История импортов</h2>
+              <button className="modal-close" onClick={() => setShowImportHistory(false)}>&times;</button>
+            </div>
             <div className="import-history-content">
-              {importHistory.length === 0 ? (<p className="hint" style={{textAlign:'center',padding:'20px'}}>История пуста</p>) : (<>
-                <p className="hint" style={{marginBottom:'12px'}}>Всего записей: {importHistory.length}</p>
-                <div className="import-history-list">{importHistory.map(entry => (
-                  <div key={entry.id} className="import-history-item">
-                    <div className="history-source"><span className={`source-badge source-${entry.source}`}>{entry.source === 'file' ? '📁 Файл' : '🌐 SEW'}</span></div>
-                    <div className="history-details"><span className="history-row-count">{entry.rowCount} {declension(entry.rowCount, ['товар','товара','товаров'])}</span><span className="history-time">{formatTimestamp(entry.timestamp)}</span></div>
-                  </div>))}
-                </div>
-              </>)}
+              {importHistory.length === 0 ? (
+                <p className="hint" style={{textAlign:'center',padding:'20px'}}>История пуста</p>
+              ) : (
+                <>
+                  <p className="hint" style={{marginBottom:'12px'}}>Всего записей: {importHistory.length}</p>
+                  <div className="import-history-list">
+                    {importHistory.map(entry => (
+                      <div key={entry.id} className="import-history-item">
+                        <div className="history-source">
+                          <span className={`source-badge source-${entry.source}`}>{entry.source === 'file' ? '📁 Файл' : '🌐 SEW'}</span>
+                        </div>
+                        <div className="history-details">
+                          <span className="history-row-count">{entry.rowCount} {declension(entry.rowCount, ['товар','товара','товаров'])}</span>
+                          <span className="history-time">{formatTimestamp(entry.timestamp)}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
             <div className="modal-actions">
               <button className="btn-danger" onClick={() => { if(window.confirm('Очистить всю историю импортов?')) { localStorage.removeItem(HISTORY_STORAGE_KEY); setImportHistory([]) }}}>Очистить</button>
@@ -348,7 +386,10 @@ export default function App() {
       {showAdminLogin && (
         <div className="modal-overlay" onClick={() => { setShowAdminLogin(false); setPasswordError(false) }}>
           <div className="modal admin-login-modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-header"><h2>Вход в админ-панель</h2><button className="modal-close" onClick={() => { setShowAdminLogin(false); setPasswordError(false) }}>&times;</button></div>
+            <div className="modal-header">
+              <h2>Вход в админ-панель</h2>
+              <button className="modal-close" onClick={() => { setShowAdminLogin(false); setPasswordError(false) }}>&times;</button>
+            </div>
             <div className="admin-login-content">
               <input type="password" placeholder="Пароль администратора" value={passwordInput} onChange={e => { setPasswordInput(e.target.value); setPasswordError(false) }} onKeyDown={e => { if(e.key === 'Enter') doUnlock() }} autoFocus />
               {passwordError && <p className="hint" style={{ color:'#c62828', textAlign:'center' }}>Неверный пароль</p>}
