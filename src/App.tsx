@@ -154,12 +154,13 @@ export default function App() {
     setEditorRow(undefined)
   }
 
-  const handleImport = (newRows: ProductRow[], source: 'file' | 'sew' = 'file') => {
+  const handleImport = async (newRows: ProductRow[], source: 'file' | 'sew' = 'file') => {
     addImportEntry(source, newRows.length)
     setImportHistory(loadImportHistory())
-    setRows(prev => [...prev, ...newRows])
+    const updated = [...rows, ...newRows]
+    setRows(updated)
     setShowImport(false)
-    setSuccess(`Добавлено ${newRows.length} новых товаров`)
+    await handleSaveToGitHub(updated)
   }
 
   const handleSEWLoad = async () => {
@@ -412,12 +413,13 @@ export default function App() {
                 <button className="btn-cancel" onClick={() => setSewPreviewRows([])}>Отмена</button>
                 <button
                   className="btn-confirm"
-                  onClick={() => {
+                  onClick={async () => {
                     addImportEntry('sew', sewPreviewRows.length)
                     setImportHistory(loadImportHistory())
-                    setRows(prev => [...prev, ...sewPreviewRows])
+                    const updated = [...rows, ...sewPreviewRows]
+                    setRows(updated)
                     setSewPreviewRows([])
-                    setSuccess(`Добавлено ${sewPreviewRows.length} новых товаров`)
+                    await handleSaveToGitHub(updated)
                   }}
                 >
                   Добавить {sewPreviewRows.length} новых товаров
