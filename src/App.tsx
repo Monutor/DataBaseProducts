@@ -69,6 +69,7 @@ export default function App() {
   const [ghToken, setGhToken] = useState(() => localStorage.getItem('gh_token') || '')
   const [ghTokenInput, setGhTokenInput] = useState('')
   const [sewToken, setSewTokenState] = useState(() => (localStorage.getItem('sew_token') || '').trim())
+  const [sewTokenInput, setSewTokenInput] = useState('')
   const [rows, setRows] = useState<ProductRow[]>([])
   const [sha, setSha] = useState('')
   const [lastUpdatedDate, setLastUpdatedDate] = useState('')
@@ -260,7 +261,7 @@ export default function App() {
                   {ghToken ? (<><span style={{ fontSize:'12px', color:'#4caf50' }}>GH OK</span><button onClick={() => { setGhToken(''); localStorage.removeItem('gh_token'); setSha('') }} className="btn-clear-token">✕</button></>) : (<><input type="password" placeholder="GH Token" value={ghTokenInput} onChange={e => setGhTokenInput(e.target.value)} className="admin-token-input" autoComplete="new-password" /><button className="btn-token-save" onClick={() => { setGhToken(ghTokenInput); localStorage.setItem('gh_token', ghTokenInput); loadAdminData() }}>OK</button></>)}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  {sewToken ? (<><span style={{ fontSize:'12px', color:'#4caf50' }}>SEW OK</span><button onClick={() => { setSewTokenState(''); localStorage.removeItem('sew_token') }} className="btn-clear-token">✕</button></>) : (<><input type="password" placeholder="SEW Token" defaultValue={sewToken} onKeyDown={e => { if (e.key === 'Enter') { const val=e.currentTarget.value.trim(); if (val) localStorage.setItem('sew_token', val); setSewTokenState(val) } }} className="admin-token-input" autoComplete="new-password" style={{ width:'120px' }} /></>)}
+                  {sewToken ? (<><span style={{ fontSize:'12px', color:'#4caf50' }}>SEW OK</span><button onClick={() => { setSewTokenState(''); localStorage.removeItem('sew_token') }} className="btn-clear-token">✕</button></>) : (<><input type="password" placeholder="SEW Token" value={sewTokenInput} onChange={e => setSewTokenInput(e.target.value)} className="admin-token-input" autoComplete="new-password" style={{ width:'120px' }} /><button className="btn-token-save" onClick={() => { if (sewTokenInput.trim()) { localStorage.setItem('sew_token', sewTokenInput.trim()); setSewTokenState(sewTokenInput.trim()) } }}>OK</button></>)}
                 </div>
               </div>
               <button className="btn-logout" onClick={() => { setAdminMode(false); setGhToken(''); setSewTokenState(''); localStorage.removeItem('gh_token'); localStorage.removeItem('sew_token') }}>
