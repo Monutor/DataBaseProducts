@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
-import { fetchJSON, commitJSON } from './github/api'
+import { fetchPublicJSON, commitPublicJSON, fetchJSON, commitJSON } from './github/api'
 import type { ProductRow } from './csv/types'
 import ProductTable from './components/ProductTable'
 import ProductEditor from './components/ProductEditor'
@@ -60,13 +60,15 @@ function getSavedPassword(): string | null {
 }
 
 export default function App() {
-  const [unlocked, setUnlocked] = useState(() => IS_DEV ? true : (!ADMIN_PASSWORD || !!getSavedPassword()))
-  const [passwordInput, setPasswordInput] = useState(getSavedPassword() || '')
+  const savedPw = getSavedPassword()
+  const [adminMode, setAdminMode] = useState(() => IS_DEV)
+  const [showAdminLogin, setShowAdminLogin] = useState(false)
+  const [passwordInput, setPasswordInput] = useState(savedPw || '')
   const [passwordError, setPasswordError] = useState(false)
-  const [remember, setRemember] = useState(!!getSavedPassword())
-  const [token, setToken] = useState(() => localStorage.getItem('gh_token') || '')
+  const [remember, setRemember] = useState(!!savedPw)
+  const [ghToken, setGhToken] = useState(() => localStorage.getItem('gh_token') || '')
+  const [ghTokenInput, setGhTokenInput] = useState('')
   const [sewToken, setSewTokenState] = useState(() => (localStorage.getItem('sew_token') || '').trim())
-  const [tokenInput, setTokenInput] = useState(token)
   const [rows, setRows] = useState<ProductRow[]>([])
   const [sha, setSha] = useState('')
   const [lastUpdatedDate, setLastUpdatedDate] = useState('')
@@ -82,44 +84,50 @@ export default function App() {
   const [showImportHistory, setShowImportHistory] = useState(false)
   const [importHistory, setImportHistory] = useState<ImportHistoryEntry[]>(loadImportHistory)
 
-  const loadData = useCallback(async () => {
-    if (!IS_DEV && !token) return
+  const loadPublicData = useCallback(async () => {
     setLoading(true)
     setError('')
     setSuccess('')
     try {
-      const { content, sha: fileSha, date } = await fetchJSON(token)
+      const content = await fetchPublicJSON()
+      setRows(JSON.parse(content))
+      setSuccess('Данные загружены')
+    } catch (e: unknown) {
+      setError('Ошибка загрузки: ' + (e instanceof Error ? e.message : 'Неизвестная ошибка'))
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  const loadAdminData = useCallback(async () => {
+    if (!ghToken) return
+    setLoading(true)
+    setError('')
+    setSuccess('')
+    try {
+      const { content, sha: fileSha, date } = await fetchJSON(ghToken)
       setRows(JSON.parse(content))
       setSha(fileSha)
       if (date) setLastUpdatedDate(date)
       setSuccess('Данные загружены')
     } catch (e: unknown) {
-      setError(
-        'Ошибка загрузки: ' +
-          (e instanceof Error ? e.message : 'Неизвестная ошибка')
-      )
+      setError('Ошибка загрузки: ' + (e instanceof Error ? e.message : 'Неизвестная ошибка'))
     } finally {
       setLoading(false)
     }
-  }, [token, IS_DEV])
+  }, [ghToken])
 
-  useEffect(() => {
-    if (IS_DEV) loadData()
-  }, [loadData, IS_DEV])
-
-  useEffect(() => {
-    if (!IS_DEV && token) loadData()
-  }, [token, loadData, IS_DEV])
+  useEffect(() => { loadPublicData() }, [loadPublicData])
 
   const handleSaveToGitHub = async (updated: ProductRow[]) => {
-    if (!IS_DEV && (!token || !sha)) return
+    if (!ghToken || !sha) return
     setSaving(true)
     setError('')
     setSuccess('')
     try {
-      await commitJSON(token, JSON.stringify(updated, null, 2), sha, '[Admin] Обновление базы товаров')
+      await commitJSON(ghToken, JSON.stringify(updated, null, 2), sha, '[Admin] Обновление базы товаров')
       setSuccess('Изменения сохранены в GitHub!')
-      const result = await fetchJSON(token)
+      const result = await fetchJSON(ghToken)
       setRows(JSON.parse(result.content))
       setSha(result.sha)
       if (result.date) setLastUpdatedDate(result.date)
@@ -160,7 +168,17 @@ export default function App() {
     const updated = [...rows, ...newRows]
     setRows(updated)
     setShowImport(false)
-    await handleSaveToGitHub(updated)
+    try {
+      setSaving(true)
+      setError('')
+      setSuccess('')
+      await commitPublicJSON(JSON.stringify(updated, null, 2), '[Import] Добавление товаров')
+      setSuccess('Добавлено ' + newRows.length + ' ' + declension(newRows.length, ['товар', 'товара', 'товаров']))
+    } catch (e: unknown) {
+      setError('Ошибка сохранения: ' + (e instanceof Error ? e.message : 'Неизвестная ошибка'))
+    } finally {
+      setSaving(false)
+    }
   }
 
   const handleSEWLoad = async () => {
@@ -200,231 +218,105 @@ export default function App() {
       localStorage.setItem('admin_password', passwordInput)
       localStorage.setItem('admin_password_expires', String(Date.now() + PASSWORD_EXPIRY_MS))
     }
-    setUnlocked(true)
-  }
-
-  if (!unlocked) {
-    return (
-      <div className="app">
-        <div className="login">
-          <h1>Admin Panel</h1>
-          <input
-            type="password"
-            placeholder="Пароль администратора"
-            value={passwordInput}
-            onChange={e => { setPasswordInput(e.target.value); setPasswordError(false) }}
-            onKeyDown={e => { if (e.key === 'Enter') doUnlock() }}
-          />
-          {passwordError && <p className="hint" style={{ color: '#c62828' }}>Неверный пароль</p>}
-          <label className="remember-row">
-            <input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)} />
-            Запомнить пароль на 2 дня
-          </label>
-          <button onClick={doUnlock}>
-            Войти
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  if (!IS_DEV && !token) {
-    return (
-      <div className="app">
-        <div className="login">
-          <h1>Admin Panel</h1>
-          <p className="repo-label">
-            База данных товаров магазина S187
-          </p>
-          <input
-            type="password"
-            placeholder="GitHub Personal Access Token"
-            value={tokenInput}
-            onChange={e => setTokenInput(e.target.value)}
-          />
-          <button
-            onClick={() => {
-              setToken(tokenInput)
-              localStorage.setItem('gh_token', tokenInput)
-            }}
-          >
-            Войти
-          </button>
-          <p className="hint">
-            Токен хранится только в localStorage вашего браузера
-          </p>
-        </div>
-      </div>
-    )
+    setAdminMode(true)
+    setShowAdminLogin(false)
+    setPasswordInput('')
+    if (ghToken) loadAdminData()
   }
 
   return (
     <div className="app">
       <header>
-        <h1>
-          База данных товаров магазина S187
-        </h1>
+        <h1>База данных товаров магазина S187</h1>
         <div className="header-actions">
           {success && <span className="status ok">{success}</span>}
           {loading && <span className="status loading">Загрузка...</span>}
           {saving && <span className="status loading">Сохранение...</span>}
-          <button onClick={loadData} disabled={loading}>
+          <button onClick={adminMode ? loadAdminData : loadPublicData} disabled={loading}>
             Обновить
           </button>
-          <button
-            onClick={() => setShowImport(true)}
-            disabled={loading}
-            className="btn-import"
-          >
+          <button onClick={() => setShowImport(true)} disabled={loading} className="btn-import">
             📥 Импорт
           </button>
-          <button
-            onClick={() => handleSaveToGitHub(rows)}
-            disabled={saving || loading || rows.length === 0}
-            className="btn-save-github"
-          >
-            💾 Сохранить в GitHub
-          </button>
-          <button
-            className="btn-logout"
-            onClick={() => {
-              setToken('')
-              localStorage.removeItem('gh_token')
-            }}
-          >
-            Выйти
-          </button>
-          <button
-            onClick={handleSEWLoad}
-            disabled={sewLoading || !sewToken.trim()}
-            className="btn-sew-load"
-            title="Загрузить данные с SEW API"
-          >
-            {sewLoading ? '⏳' : '📥'} Загрузить с SEW
-          </button>
-          <button
-            onClick={() => setShowImportHistory(true)}
-            className="btn-history"
-            title="История импортов"
-          >
+          <button onClick={() => setShowImportHistory(true)} className="btn-history" title="История импортов">
             📋 История
           </button>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {sewToken ? (
-              <>
-                <span title="SEW токен установлен" style={{ fontSize: '12px', color: '#4caf50' }}>SEW OK</span>
-                <button onClick={() => { setSewTokenState(''); localStorage.removeItem('sew_token') }} className="btn-clear-token">
-                  ✕
-                </button>
-              </>
-            ) : (
-              <input
-                type="password"
-                placeholder="Токен (без Bearer)"
-                defaultValue={sewToken}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') {
-                    const val = e.currentTarget.value.trim()
-                    if (val) localStorage.setItem('sew_token', val)
-                    setSewTokenState(val)
-                  }
-                }}
-                className="sew-token-input"
-                style={{ width: '140px' }}
-                autoComplete="new-password"
-              />
-            )}
-          </div>
+          <button className="btn-admin-toggle" onClick={() => { if (adminMode) { setAdminMode(false) } else if (IS_DEV) { setAdminMode(true) } else { setShowAdminLogin(true) } }}>
+            ⚙️
+          </button>
+          {adminMode && (
+            <>
+              <button onClick={() => handleSaveToGitHub(rows)} disabled={saving || loading || rows.length === 0 || !ghToken || !sha} className="btn-save-github">
+                💾 Сохранить в GitHub
+              </button>
+              <button onClick={handleSEWLoad} disabled={sewLoading || !sewToken.trim()} className="btn-sew-load" title="Загрузить данные с SEW API">
+                {sewLoading ? '⏳' : '📥'} Загрузить с SEW
+              </button>
+              <div className="admin-token-section">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  {ghToken ? (<><span style={{ fontSize:'12px', color:'#4caf50' }}>GH OK</span><button onClick={() => { setGhToken(''); localStorage.removeItem('gh_token'); setSha('') }} className="btn-clear-token">✕</button></>) : (<><input type="password" placeholder="GH Token" value={ghTokenInput} onChange={e => setGhTokenInput(e.target.value)} className="admin-token-input" autoComplete="new-password" /><button className="btn-token-save" onClick={() => { setGhToken(ghTokenInput); localStorage.setItem('gh_token', ghTokenInput); loadAdminData() }}>OK</button></>)}
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  {sewToken ? (<><span style={{ fontSize:'12px', color:'#4caf50' }}>SEW OK</span><button onClick={() => { setSewTokenState(''); localStorage.removeItem('sew_token') }} className="btn-clear-token">✕</button></>) : (<><input type="password" placeholder="SEW Token" defaultValue={sewToken} onKeyDown={e => { if (e.key === 'Enter') { const val=e.currentTarget.value.trim(); if (val) localStorage.setItem('sew_token', val); setSewTokenState(val) } }} className="admin-token-input" autoComplete="new-password" style={{ width:'120px' }} /></>)}
+                </div>
+              </div>
+              <button className="btn-logout" onClick={() => { setAdminMode(false); setGhToken(''); setSewTokenState(''); localStorage.removeItem('gh_token'); localStorage.removeItem('sew_token') }}>
+                Выйти
+              </button>
+            </>
+          )}
         </div>
       </header>
 
       {error && sewPreviewRows.length === 0 && <div className="error">{error}</div>}
 
       {rows.length > 0 ? (
-        <ProductTable rows={rows} onEdit={handleEdit} onAdd={handleAdd} />
+        <ProductTable rows={rows} onEdit={adminMode ? handleEdit : undefined} onAdd={adminMode ? handleAdd : undefined} />
       ) : loading ? (
         <p className="status-msg">Загрузка данных...</p>
       ) : (
         <div className="empty-state">
-          <p>Нажмите «Обновить» для загрузки данных из репозитория.</p>
-          <button onClick={loadData}>Обновить</button>
+          <p>Нажмите «Обновить» для загрузки данных.</p>
+          <button onClick={loadPublicData}>Обновить</button>
         </div>
       )}
 
-      {editorRow !== undefined && (
-        <ProductEditor
-          row={
-            editorRow && Object.keys(editorRow).length > 0 ? editorRow : null
-          }
-          onSave={handleEditorSave}
-          onCancel={() => setEditorRow(undefined)}
-        />
+      {adminMode && editorRow !== undefined && (
+        <ProductEditor row={editorRow && Object.keys(editorRow).length > 0 ? editorRow : null} onSave={handleEditorSave} onCancel={() => setEditorRow(undefined)} />
       )}
 
-      {showImport && (
-        <ImportDialog
-          rows={rows}
-          onConfirm={handleImport}
-          onCancel={() => setShowImport(false)}
-        />
-      )}
+      {showImport && <ImportDialog rows={rows} onConfirm={handleImport} onCancel={() => setShowImport(false)} />}
 
       {sewPreviewRows.length > 0 && (
         <div className="modal-overlay" onClick={() => setSewPreviewRows([])}>
           <div className="modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>Новые товары из SEW</h2>
-              <button className="modal-close" onClick={() => setSewPreviewRows([])}>&times;</button>
-            </div>
-
+            <div className="modal-header"><h2>Новые товары из SEW</h2><button className="modal-close" onClick={() => setSewPreviewRows([])}>&times;</button></div>
             <div className="import-results">
               <p className="import-status new">Найдено новых товаров: {sewPreviewRows.length}</p>
-
-              <div className="new-products-section">
-                <h3>Новые товары</h3>
+              <div className="new-products-section"><h3>Новые товары</h3>
                 <div className="new-products-scroll">
-                  <table className="new-products-table">
-                    <thead>
-                      <tr>
-                        <th>Код товара</th>
-                        <th>Наименование</th>
-                        <th>Количество</th>
-                        <th>Бренд</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {sewPreviewRows.slice(0, 200).map((r, i) => (
-                        <tr key={i}>
-                          <td>{r['Код товара']}</td>
-                          <td>{r['Наименование']}</td>
-                          <td>{r['Количество']}</td>
-                          <td>{r['Бренд']}</td>
-                        </tr>
-                      ))}
-                    </tbody>
+                  <table className="new-products-table"><thead><tr><th>Код товара</th><th>Наименование</th><th>Количество</th><th>Бренд</th></tr></thead>
+                    <tbody>{sewPreviewRows.slice(0,200).map((r,i) => (<tr key={i}><td>{r['Код товара']}</td><td>{r['Наименование']}</td><td>{r['Количество']}</td><td>{r['Бренд']}</td></tr>))}</tbody>
                   </table>
-                  {sewPreviewRows.length > 200 && (
-                    <p className="hint">... и ещё {sewPreviewRows.length - 200} товаров</p>
-                  )}
+                  {sewPreviewRows.length > 200 && <p className="hint">... и ещё {sewPreviewRows.length - 200} товаров</p>}
                 </div>
               </div>
-
-              <div className="modal-actions">
-                <button className="btn-cancel" onClick={() => setSewPreviewRows([])}>Отмена</button>
-                <button
-                  className="btn-confirm"
-                  onClick={async () => {
-                    addImportEntry('sew', sewPreviewRows.length)
-                    setImportHistory(loadImportHistory())
-                    const updated = [...rows, ...sewPreviewRows]
-                    setRows(updated)
-                    setSewPreviewRows([])
-                    await handleSaveToGitHub(updated)
-                  }}
-                >
-                  Добавить {sewPreviewRows.length} новых товаров
-                </button>
-              </div>
+            </div>
+            <div className="modal-actions">
+              <button className="btn-cancel" onClick={() => setSewPreviewRows([])}>Отмена</button>
+              <button className="btn-confirm" onClick={async () => {
+                addImportEntry('sew', sewPreviewRows.length)
+                setImportHistory(loadImportHistory())
+                const updated = [...rows, ...sewPreviewRows]
+                setRows(updated)
+                setSewPreviewRows([])
+                try {
+                  setSaving(true); setError(''); setSuccess('')
+                  await commitPublicJSON(JSON.stringify(updated, null, 2), '[Import] Добавление товаров из SEW')
+                  setSuccess('Добавлено ' + sewPreviewRows.length + ' ' + declension(sewPreviewRows.length, ['товар', 'товара', 'товаров']))
+                } catch (e: unknown) { setError('Ошибка сохранения: ' + (e instanceof Error ? e.message : 'Неизвестная ошибка'))
+                } finally { setSaving(false) }
+              }}>Добавить {sewPreviewRows.length} новых товаров</button>
             </div>
           </div>
         </div>
@@ -433,58 +325,45 @@ export default function App() {
       {showImportHistory && (
         <div className="modal-overlay" onClick={() => setShowImportHistory(false)}>
           <div className="modal import-history-modal" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2>История импортов</h2>
-              <button className="modal-close" onClick={() => setShowImportHistory(false)}>&times;</button>
-            </div>
-
+            <div className="modal-header"><h2>История импортов</h2><button className="modal-close" onClick={() => setShowImportHistory(false)}>&times;</button></div>
             <div className="import-history-content">
-              {importHistory.length === 0 ? (
-                <p className="hint" style={{ textAlign: 'center', padding: '20px' }}>История пуста</p>
-              ) : (
-                <>
-                  <p className="hint" style={{ marginBottom: '12px' }}>Всего записей: {importHistory.length}</p>
-                  <div className="import-history-list">
-                    {importHistory.map(entry => (
-                      <div key={entry.id} className="import-history-item">
-                        <div className="history-source">
-                          <span className={`source-badge source-${entry.source}`}>
-                            {entry.source === 'file' ? '📁 Файл' : '🌐 SEW'}
-                          </span>
-                        </div>
-                        <div className="history-details">
-                          <span className="history-row-count">{entry.rowCount} {declension(entry.rowCount, ['товар', 'товара', 'товаров'])}</span>
-                          <span className="history-time">{formatTimestamp(entry.timestamp)}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
+              {importHistory.length === 0 ? (<p className="hint" style={{textAlign:'center',padding:'20px'}}>История пуста</p>) : (<>
+                <p className="hint" style={{marginBottom:'12px'}}>Всего записей: {importHistory.length}</p>
+                <div className="import-history-list">{importHistory.map(entry => (
+                  <div key={entry.id} className="import-history-item">
+                    <div className="history-source"><span className={`source-badge source-${entry.source}`}>{entry.source === 'file' ? '📁 Файл' : '🌐 SEW'}</span></div>
+                    <div className="history-details"><span className="history-row-count">{entry.rowCount} {declension(entry.rowCount, ['товар','товара','товаров'])}</span><span className="history-time">{formatTimestamp(entry.timestamp)}</span></div>
+                  </div>))}
+                </div>
+              </>)}
             </div>
-
             <div className="modal-actions">
-              <button
-                className="btn-danger"
-                onClick={() => {
-                  if (window.confirm('Очистить всю историю импортов?')) {
-                    localStorage.removeItem(HISTORY_STORAGE_KEY)
-                    setImportHistory([])
-                  }
-                }}
-              >
-                Очистить
-              </button>
+              <button className="btn-danger" onClick={() => { if(window.confirm('Очистить всю историю импортов?')) { localStorage.removeItem(HISTORY_STORAGE_KEY); setImportHistory([]) }}}>Очистить</button>
               <button className="btn-cancel" onClick={() => setShowImportHistory(false)}>Закрыть</button>
             </div>
           </div>
         </div>
       )}
 
+      {showAdminLogin && (
+        <div className="modal-overlay" onClick={() => { setShowAdminLogin(false); setPasswordError(false) }}>
+          <div className="modal admin-login-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header"><h2>Вход в админ-панель</h2><button className="modal-close" onClick={() => { setShowAdminLogin(false); setPasswordError(false) }}>&times;</button></div>
+            <div className="admin-login-content">
+              <input type="password" placeholder="Пароль администратора" value={passwordInput} onChange={e => { setPasswordInput(e.target.value); setPasswordError(false) }} onKeyDown={e => { if(e.key === 'Enter') doUnlock() }} autoFocus />
+              {passwordError && <p className="hint" style={{ color:'#c62828', textAlign:'center' }}>Неверный пароль</p>}
+              <label className="remember-row"><input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)} /> Запомнить пароль на 2 дня</label>
+            </div>
+            <div className="modal-actions">
+              <button className="btn-cancel" onClick={() => { setShowAdminLogin(false); setPasswordError(false) }}>Отмена</button>
+              <button className="btn-confirm" onClick={doUnlock}>Войти</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <footer className="app-footer">
-        {lastUpdatedDate && (
-          <span>База обновлена: {formatISODate(lastUpdatedDate)}</span>
-        )}
+        {lastUpdatedDate && <span>База обновлена: {formatISODate(lastUpdatedDate)}</span>}
       </footer>
     </div>
   )
