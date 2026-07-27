@@ -89,4 +89,53 @@ export async function commitJSON(
   if (!res.ok) throw new Error('Failed to save db.json: ' + (await res.text()))
 }
 
+export async function fetchPublicJSON(): Promise<string> {
+  if (IS_DEV) {
+    const res = await fetch('/api/local/db.json')
+    if (!res.ok) throw new Error('Failed to read local db.json')
+    return await res.text()
+  }
+  const url = `https://raw.githubusercontent.com/${OWNER}/${REPO}/main/db.json`
+  const res = await fetch(url)
+  if (!res.ok) throw new Error('Failed to fetch public db.json')
+  return await res.text()
+}
+
+async function fetchShaViaContentsAPI(token: string): Promise<string> {
+  const res = await fetch(`${API_BASE}/repos/${OWNER}/${REPO}/contents/db.json`, {
+    headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' },
+  })
+  if (!res.ok) throw new Error('Failed to get db.json info')
+  const data = await res.json()
+  return data.sha as string
+}
+
+export async function commitPublicJSON(content: string, message: string): Promise<void> {
+  if (IS_DEV) {
+    const res = await fetch('/api/local/db.json', {
+      method: 'POST',
+      body: content,
+    })
+    if (!res.ok) throw new Error('Failed to save local db.json')
+    return
+  }
+  const token = import.meta.env.VITE_PUBLIC_TOKEN || ''
+  if (!token) throw new Error('VITE_PUBLIC_TOKEN not configured')
+  const sha = await fetchShaViaContentsAPI(token)
+  const res = await fetch(`${API_BASE}/repos/${OWNER}/${REPO}/contents/db.json`, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/vnd.github+json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      message,
+      content: encodeUTF8Base64(content),
+      sha,
+    }),
+  })
+  if (!res.ok) throw new Error('Failed to save: ' + (await res.text()))
+}
+
 export { OWNER, REPO }
