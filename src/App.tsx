@@ -231,7 +231,7 @@ export default function App() {
   return (
     <div className="app">
       <header>
-        <h1>База данных товаров магазина S187</h1>
+        <h1>База данных товаров магазина М.Видео</h1>
         <div className="header-actions">
           {success && <span className="status ok">{success}</span>}
           {loading && <span className="status loading">Загрузка...</span>}
