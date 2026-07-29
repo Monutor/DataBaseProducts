@@ -29,6 +29,7 @@ jobs:
           VITE_GITHUB_OWNER: ${{ vars.VITE_GITHUB_OWNER }}
           VITE_GITHUB_REPO: ${{ vars.VITE_GITHUB_REPO }}
           VITE_ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          VITE_PUBLIC_TOKEN: ${{ secrets.VITE_PUBLIC_TOKEN }}
       - uses: actions/configure-pages@v4
       - uses: actions/upload-pages-artifact@v3
         with:
