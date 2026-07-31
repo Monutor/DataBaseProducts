@@ -249,7 +249,7 @@ export default function App() {
           <button onClick={adminMode ? loadAdminData : loadPublicData} disabled={loading}>
             Обновить
           </button>
-          <button onClick={() => setShowImport(true)} disabled={loading} className="btn-import">
+          <button onClick={() => setShowImport(true)} disabled={loading} className="btn btn-import">
             📥 Импорт
           </button>
           <button onClick={() => setShowImportHistory(true)} className="btn btn-history" title="История импортов">
@@ -327,11 +327,11 @@ export default function App() {
       {showImport && <ImportDialog rows={rows} onConfirm={handleImport} onCancel={() => setShowImport(false)} />}
 
        {sewPreviewRows.length > 0 && (
-        <button type="button" className="modal-overlay" onClick={() => setSewPreviewRows([])}>
+        <div className="modal-overlay" onClick={() => setSewPreviewRows([])}>
           <div className="modal" role="dialog" aria-modal="true">
             <div className="modal-header">
               <h2>Новые товары из SEW</h2>
-              <button className="modal-close" onClick={() => setSewPreviewRows([])}>&times;</button>
+              <button type="button" className="modal-close" onClick={() => setSewPreviewRows([])}>&times;</button>
             </div>
             <div className="import-results">
               <p className="import-status new">Найдено новых товаров: {sewPreviewRows.length}</p>
@@ -379,15 +379,15 @@ export default function App() {
               }}>Добавить {sewPreviewRows.length} новых товаров</button>
             </div>
           </div>
-        </button>
+        </div>
       )}
 
       {showImportHistory && (
-        <button type="button" className="modal-overlay" onClick={() => setShowImportHistory(false)}>
+        <div className="modal-overlay" onClick={() => setShowImportHistory(false)}>
           <div className="modal import-history-modal" role="dialog" aria-modal="true">
             <div className="modal-header">
               <h2>История импортов</h2>
-              <button className="modal-close" onClick={() => setShowImportHistory(false)}>&times;</button>
+              <button type="button" className="modal-close" onClick={() => setShowImportHistory(false)}>&times;</button>
             </div>
             <div className="import-history-content">
               {importHistory.length === 0 ? (
@@ -416,15 +416,15 @@ export default function App() {
               <button className="btn-cancel" onClick={() => setShowImportHistory(false)}>Закрыть</button>
             </div>
           </div>
-        </button>
+        </div>
       )}
 
       {showAdminLogin && (
-        <button type="button" className="modal-overlay" onClick={() => { setShowAdminLogin(false); setPasswordError(false) }}>
+        <div className="modal-overlay" onClick={() => { setShowAdminLogin(false); setPasswordError(false) }}>
           <div className="modal admin-login-modal" role="dialog" aria-modal="true">
             <div className="modal-header">
               <h2>Вход в админ-панель</h2>
-              <button className="modal-close" onClick={() => { setShowAdminLogin(false); setPasswordError(false) }}>&times;</button>
+              <button type="button" className="modal-close" onClick={() => { setShowAdminLogin(false); setPasswordError(false) }}>&times;</button>
             </div>
             <div className="admin-login-content">
               <input type="password" placeholder="Пароль администратора" value={passwordInput} onChange={e => { setPasswordInput(e.target.value); setPasswordError(false) }} onKeyDown={e => { if(e.key === 'Enter') doUnlock() }} autoFocus aria-label="Пароль администратора" />
@@ -436,7 +436,7 @@ export default function App() {
               <button className="btn-confirm" onClick={doUnlock}>Войти</button>
             </div>
           </div>
-        </button>
+        </div>
       )}
 
       <footer className="app-footer">

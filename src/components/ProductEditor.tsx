@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { ProductRow } from '../csv/types'
 import './ProductEditor.css'
 
@@ -72,8 +72,14 @@ export default function ProductEditor({ row, onSave, onCancel }: Props) {
     onSave({ ...form, 'Последнее изменение МСК': now })
   }
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onCancel() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onCancel])
+
   return (
-    <button type="button" className="modal-overlay" onClick={onCancel}>
+    <div className="modal-overlay" onClick={onCancel}>
       <div className="modal" role="dialog" aria-modal="true">
         <h2>{row ? 'Редактировать товар' : 'Добавить товар'}</h2>
         <div className="form-grid">
@@ -105,6 +111,6 @@ export default function ProductEditor({ row, onSave, onCancel }: Props) {
           </button>
         </div>
       </div>
-    </button>
+    </div>
   )
 }

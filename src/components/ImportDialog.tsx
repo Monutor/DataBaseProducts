@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from 'react'
+import { useState, useRef, useMemo, useEffect } from 'react'
 import type { ProductRow } from '../csv/types'
 import './ImportDialog.css'
 import type { ParseResult } from '../shared/parser'
@@ -88,12 +88,18 @@ export default function ImportDialog({ rows, onConfirm, onCancel }: Props) {
     if (inputRef.current) inputRef.current.value = ''
   }
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onCancel() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onCancel])
+
   return (
-    <button type="button" className="modal-overlay" onClick={onCancel}>
+    <div className="modal-overlay" onClick={onCancel}>
       <div className="modal" role="dialog" aria-modal="true">
         <div className="modal-header">
           <h2>Импорт товаров</h2>
-          <button className="modal-close" onClick={onCancel}>&times;</button>
+          <button type="button" className="modal-close" onClick={onCancel}>&times;</button>
         </div>
 
         <div
@@ -174,6 +180,6 @@ export default function ImportDialog({ rows, onConfirm, onCancel }: Props) {
           </button>
         </div>
       </div>
-    </button>
+    </div>
   )
 }
