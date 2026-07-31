@@ -249,7 +249,7 @@ export default function App() {
           <button onClick={adminMode ? loadAdminData : loadPublicData} disabled={loading}>
             Обновить
           </button>
-          <button onClick={() => setShowImport(true)} disabled={loading} className="btn btn-import">
+          <button onClick={() => setShowImport(true)} disabled={loading} className="btn-import">
             📥 Импорт
           </button>
           <button onClick={() => setShowImportHistory(true)} className="btn btn-history" title="История импортов">
@@ -326,9 +326,9 @@ export default function App() {
 
       {showImport && <ImportDialog rows={rows} onConfirm={handleImport} onCancel={() => setShowImport(false)} />}
 
-        {sewPreviewRows.length > 0 && (
-         <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setSewPreviewRows([])}>
-           <div className="modal">
+       {sewPreviewRows.length > 0 && (
+        <button type="button" className="modal-overlay" onClick={() => setSewPreviewRows([])}>
+          <div className="modal" role="dialog" aria-modal="true">
             <div className="modal-header">
               <h2>Новые товары из SEW</h2>
               <button className="modal-close" onClick={() => setSewPreviewRows([])}>&times;</button>
@@ -379,12 +379,12 @@ export default function App() {
               }}>Добавить {sewPreviewRows.length} новых товаров</button>
             </div>
           </div>
-        </div>
+        </button>
       )}
 
       {showImportHistory && (
-        <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setShowImportHistory(false)}>
-          <div className="modal import-history-modal">
+        <button type="button" className="modal-overlay" onClick={() => setShowImportHistory(false)}>
+          <div className="modal import-history-modal" role="dialog" aria-modal="true">
             <div className="modal-header">
               <h2>История импортов</h2>
               <button className="modal-close" onClick={() => setShowImportHistory(false)}>&times;</button>
@@ -416,12 +416,12 @@ export default function App() {
               <button className="btn-cancel" onClick={() => setShowImportHistory(false)}>Закрыть</button>
             </div>
           </div>
-        </div>
+        </button>
       )}
 
       {showAdminLogin && (
-        <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => { setShowAdminLogin(false); setPasswordError(false) }}>
-          <div className="modal admin-login-modal">
+        <button type="button" className="modal-overlay" onClick={() => { setShowAdminLogin(false); setPasswordError(false) }}>
+          <div className="modal admin-login-modal" role="dialog" aria-modal="true">
             <div className="modal-header">
               <h2>Вход в админ-панель</h2>
               <button className="modal-close" onClick={() => { setShowAdminLogin(false); setPasswordError(false) }}>&times;</button>
@@ -436,7 +436,7 @@ export default function App() {
               <button className="btn-confirm" onClick={doUnlock}>Войти</button>
             </div>
           </div>
-        </div>
+        </button>
       )}
 
       <footer className="app-footer">
