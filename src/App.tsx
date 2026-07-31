@@ -291,9 +291,9 @@ export default function App() {
 
       {showImport && <ImportDialog rows={rows} onConfirm={handleImport} onCancel={() => setShowImport(false)} />}
 
-      {sewPreviewRows.length > 0 && (
-        <div className="modal-overlay" onClick={() => setSewPreviewRows([])}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
+       {sewPreviewRows.length > 0 && (
+        <div className="modal-overlay" onClick={() => setSewPreviewRows([])} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSewPreviewRows([]) }}>
+          <div className="modal" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true">
             <div className="modal-header">
               <h2>Новые товары из SEW</h2>
               <button className="modal-close" onClick={() => setSewPreviewRows([])}>&times;</button>
@@ -314,7 +314,7 @@ export default function App() {
                     </thead>
                     <tbody>
                       {sewPreviewRows.slice(0,200).map((r,i) => (
-                        <tr key={i}>
+                        <tr key={`${r['Код товара'] || 'no-code'}-${i}`}>
                           <td>{r['Код товара']}</td>
                           <td>{r['Наименование']}</td>
                           <td>{r['Количество']}</td>
@@ -348,8 +348,8 @@ export default function App() {
       )}
 
       {showImportHistory && (
-        <div className="modal-overlay" onClick={() => setShowImportHistory(false)}>
-          <div className="modal import-history-modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-overlay" onClick={() => setShowImportHistory(false)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setShowImportHistory(false) }}>
+          <div className="modal import-history-modal" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true">
             <div className="modal-header">
               <h2>История импортов</h2>
               <button className="modal-close" onClick={() => setShowImportHistory(false)}>&times;</button>
@@ -385,14 +385,14 @@ export default function App() {
       )}
 
       {showAdminLogin && (
-        <div className="modal-overlay" onClick={() => { setShowAdminLogin(false); setPasswordError(false) }}>
-          <div className="modal admin-login-modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-overlay" onClick={() => { setShowAdminLogin(false); setPasswordError(false) }} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { setShowAdminLogin(false); setPasswordError(false) } }}>
+          <div className="modal admin-login-modal" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true">
             <div className="modal-header">
               <h2>Вход в админ-панель</h2>
               <button className="modal-close" onClick={() => { setShowAdminLogin(false); setPasswordError(false) }}>&times;</button>
             </div>
             <div className="admin-login-content">
-              <input type="password" placeholder="Пароль администратора" value={passwordInput} onChange={e => { setPasswordInput(e.target.value); setPasswordError(false) }} onKeyDown={e => { if(e.key === 'Enter') doUnlock() }} autoFocus />
+              <input type="password" placeholder="Пароль администратора" value={passwordInput} onChange={e => { setPasswordInput(e.target.value); setPasswordError(false) }} onKeyDown={e => { if(e.key === 'Enter') doUnlock() }} autoFocus aria-label="Пароль администратора" />
               {passwordError && <p className="hint" style={{ color:'#c62828', textAlign:'center' }}>Неверный пароль</p>}
               <label className="remember-row"><input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)} /> Запомнить пароль на 2 дня</label>
             </div>

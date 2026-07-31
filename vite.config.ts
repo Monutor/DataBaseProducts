@@ -10,15 +10,23 @@ function localDbPlugin() {
       server.middlewares.use('/api/local/db.json', (req, res) => {
         const dbPath = path.resolve(process.cwd(), 'db.json')
         if (req.method === 'GET') {
-          const content = fs.readFileSync(dbPath, 'utf-8')
-          res.setHeader('Content-Type', 'application/json')
-          res.end(content)
+          fs.promises.readFile(dbPath, 'utf-8').then((content: string) => {
+            res.setHeader('Content-Type', 'application/json')
+            res.end(content)
+          }).catch(() => {
+            res.statusCode = 500
+            res.end(JSON.stringify({ error: 'Failed to read db.json' }))
+          })
         } else if (req.method === 'POST') {
           let body = ''
           req.on('data', (chunk) => (body += chunk))
           req.on('end', () => {
-            fs.writeFileSync(dbPath, body, 'utf-8')
-            res.end(JSON.stringify({ ok: true }))
+            fs.promises.writeFile(dbPath, body, 'utf-8').then(() => {
+              res.end(JSON.stringify({ ok: true }))
+            }).catch(() => {
+              res.statusCode = 500
+              res.end(JSON.stringify({ error: 'Failed to write db.json' }))
+            })
           })
         } else {
           res.statusCode = 405

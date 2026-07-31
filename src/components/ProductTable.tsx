@@ -91,7 +91,7 @@ export default function ProductTable({ rows, onEdit, onAdd }: Props) {
             {paged.map((row, i) => {
               const realIndex = rows.indexOf(row)
               return (
-              <tr key={i}>
+              <tr key={`${row['Код товара'] || 'no-code'}-${i}`}>
                 {headers.map(h => (
                   <td key={h}>{row[h as keyof ProductRow]}</td>
                 ))}

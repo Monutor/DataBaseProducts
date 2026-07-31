@@ -89,8 +89,8 @@ export default function ImportDialog({ rows, onConfirm, onCancel }: Props) {
   }
 
   return (
-    <div className="modal-overlay" onClick={onCancel}>
-      <div className="modal" onClick={e => e.stopPropagation()}>
+    <div className="modal-overlay" onClick={onCancel} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onCancel() }}>
+      <div className="modal" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true">
         <div className="modal-header">
           <h2>Импорт товаров</h2>
           <button className="modal-close" onClick={onCancel}>&times;</button>
@@ -141,7 +141,7 @@ export default function ImportDialog({ rows, onConfirm, onCancel }: Props) {
                     </thead>
                     <tbody>
                       {newRows.slice(0, 200).map((r, i) => (
-                        <tr key={i}>
+                        <tr key={`${r['Код товара'] || 'no-code'}-${i}`}>
                           <td>{r['Код товара']}</td>
                           <td>{r['Наименование']}</td>
                           <td>{r['Количество']}</td>
