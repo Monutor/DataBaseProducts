@@ -41,6 +41,9 @@ export default defineConfig({
   plugins: [react(), localDbPlugin()],
   base: '/DataBaseProducts/',
   server: {
+    headers: {
+      'Content-Encoding': 'identity',
+    },
     proxy: {
       '/github-proxy': {
         target: 'https://api.github.com',
