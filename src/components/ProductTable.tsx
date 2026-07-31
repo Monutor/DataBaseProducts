@@ -32,6 +32,18 @@ function saveColumnOrder(order: (keyof ProductRow)[]) {
   localStorage.setItem(COLUMN_ORDER_KEY, JSON.stringify(order))
 }
 
+function highlight(text: string, query: string): string {
+  if (!query.trim()) return escapeHtml(text)
+  const escaped = escapeHtml(text)
+  const qEscaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const regex = new RegExp(`(${qEscaped})`, 'gi')
+  return escaped.replace(regex, '<mark class="search-hl">$1</mark>')
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
 export default function ProductTable({ rows, onEdit, onAdd }: Props) {
   const [search, setSearch] = useState('')
   const [sortKey, setSortKey] = useState<keyof ProductRow>('Код товара')
@@ -94,7 +106,6 @@ export default function ProductTable({ rows, onEdit, onAdd }: Props) {
     const [moved] = next.splice(from, 1)
     next.splice(to, 0, moved)
 
-    // Append any columns not in DEFAULT_COLUMN_ORDER (e.g. future additions)
     for (const k of Object.keys(rows[0] || {}) as (keyof ProductRow)[]) {
       if (!next.includes(k) && !DEFAULT_COLUMN_ORDER.includes(k)) next.push(k)
     }
@@ -141,95 +152,136 @@ export default function ProductTable({ rows, onEdit, onAdd }: Props) {
   return (
     <div className="table-container">
       <div className="toolbar">
-        <label className="sr-only" htmlFor="product-search">Поиск</label>
-        <input
-          id="product-search"
-          type="text"
-          placeholder="Поиск по всем полям..."
-          value={search}
-          onChange={e => { setSearch(e.target.value); setPage(1) }}
-          className="search-input"
-          aria-label="Поиск товаров"
-        />
-        <button onClick={() => setSearch('')} className="btn-clear-search" title="Очистить поиск">✕</button>
+        <div className="search-wrap">
+          <svg className="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="11" cy="11" r="8"/>
+            <path d="m21 21-4.35-4.35"/>
+          </svg>
+          <input
+            id="product-search"
+            type="text"
+            placeholder="Поиск по всем полям… (запятая — несколько запросов)"
+            value={search}
+            onChange={e => { setSearch(e.target.value); setPage(1) }}
+            className="search-input"
+            aria-label="Поиск товаров"
+          />
+          {search && <button className="btn-clear-search" onClick={() => { setSearch(''); setPage(1) }} title="Очистить поиск">✕</button>}
+        </div>
+        <div className="stats">
+          <span className="stat-badge stat-badge-total">Всего: {rows.length.toLocaleString('ru-RU')}</span>
+          {sorted.length < rows.length && (
+            <span className="stat-badge stat-badge-found">Найдено: {sorted.length}</span>
+          )}
+        </div>
         {onAdd && (
           <button onClick={onAdd} className="btn-add">
             + Добавить товар
           </button>
         )}
       </div>
-      <div className="table-scroll">
-        <table>
-          <thead>
-            <tr>
-              {headers.map((key, idx) => (
-                <th
-                  key={key}
-                  draggable
-                  onClick={() => handleSort(key)}
-                  onDragStart={e => handleDragStart(e, idx)}
-                  onDragEnd={handleDragEnd}
-                  onDragOver={e => handleDragOver(e, idx)}
-                  onDrop={handleDrop}
-                  className={[
-                    'sortable',
-                    dragTargetIndex === idx ? 'drag-target' : '',
-                    dragSourceIndex === idx ? 'drag-source' : '',
-                  ].filter(Boolean).join(' ')}
-                >
-                  <span className="col-handle" title="Перетащите для изменения порядка">⠿</span>
-                  {key}{' '}
-                  {sortKey === key ? (sortDir === 'asc' ? '▲' : '▼') : ''}
-                </th>
-              ))}
-              {onEdit && <th className="col-actions"></th>}
-            </tr>
-          </thead>
-          <tbody>
-            {paged.map((row, i) => {
-              const realIndex = rows.indexOf(row)
-              return (
-              <tr key={`${row['Код товара'] || 'no-code'}-${i}`}>
-                {headers.map(h => (
-                  <td key={h}>{String(row[h as keyof ProductRow] ?? '')}</td>
+
+      <div className="table-card">
+        <div className="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                {headers.map((key, idx) => (
+                  <th
+                    key={key}
+                    draggable
+                    onClick={() => handleSort(key)}
+                    onDragStart={e => handleDragStart(e as unknown as React.DragEvent<HTMLTableCellElement>, idx)}
+                    onDragEnd={handleDragEnd}
+                    onDragOver={e => handleDragOver(e as unknown as React.DragEvent<HTMLTableCellElement>, idx)}
+                    onDrop={handleDrop}
+                    className={[
+                      'sortable',
+                      dragTargetIndex === idx ? 'drag-target' : '',
+                      dragSourceIndex === idx ? 'dragging' : '',
+                      sortKey === key ? 'sorted' : '',
+                    ].filter(Boolean).join(' ')}
+                  >
+                    <span className="col-handle" title="Перетащите для изменения порядка">⠿</span>
+                    {key}{' '}
+                    {sortKey === key ? (sortDir === 'asc' ? '▲' : '▼') : ''}
+                  </th>
                 ))}
-                {onEdit && (
-                  <td>
-                    <button
-                      className="btn-edit"
-                      onClick={() => onEdit(realIndex, row)}
-                      title="Редактировать"
-                    >
-                      ✏️
-                    </button>
-                  </td>
-                )}
+                {onEdit && <th className="col-actions"></th>}
               </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
-      {hasCustomOrder && (
-        <div className="col-order-bar">
-          <span>Порядок колонок можно менять перетаскиванием заголовков.</span>
-          <button onClick={resetColumns} className="btn-reset-cols" title="Сбросить порядок колонок">↺ Сбросить</button>
+            </thead>
+            <tbody>
+              {paged.map((row, i) => {
+                const realIndex = rows.indexOf(row)
+                return (
+                  <tr key={`${row['Код товара'] || 'no-code'}-${i}`}>
+                    {headers.map(h => {
+                      const val = String(row[h as keyof ProductRow] ?? '')
+                      if (h === 'STOPSALE') {
+                        return (
+                          <td key={h}>
+                            {val === 'Да'
+                              ? <span className="badge-yes badge-stop">Да</span>
+                              : val}
+                          </td>
+                        )
+                      }
+                      if (h === 'ONLINE-ONLY') {
+                        return (
+                          <td key={h}>
+                            {val === 'Да'
+                              ? <span className="badge-yes badge-online">Да</span>
+                              : val}
+                          </td>
+                        )
+                      }
+                      if (h === 'Код товара') {
+                        return <td key={h} dangerouslySetInnerHTML={{ __html: highlight(val, search) }} />
+                      }
+                      if (search && !['STOPSALE', 'ONLINE-ONLY'].includes(h)) {
+                        return <td key={h} dangerouslySetInnerHTML={{ __html: highlight(val, search) }} />
+                      }
+                      return <td key={h}>{val}</td>
+                    })}
+                    {onEdit && (
+                      <td>
+                        <button
+                          className="btn-edit"
+                          onClick={() => onEdit(realIndex, row)}
+                          title="Редактировать"
+                        >
+                          ✏️
+                        </button>
+                      </td>
+                    )}
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
         </div>
-      )}
-      <div className="pagination">
-        <span className="row-count">
-          Строк: {rows.length}
-          {sorted.length < rows.length && ` (найдено ${sorted.length})`}
-        </span>
-        <div className="page-controls">
-          <button disabled={page <= 1} onClick={() => goToPage(page - 1)}>◀</button>
-          {getPageNumbers(page, totalPages).map((p, idx) => (
-            <button key={typeof p === 'number' ? p : `e${idx}`} className={p === page ? 'page-active' : ''} onClick={() => typeof p === 'number' && goToPage(p)} disabled={typeof p !== 'number'}>
-              {p}
-            </button>
-          ))}
-          <button disabled={page >= totalPages} onClick={() => goToPage(page + 1)}>▶</button>
+
+        <div className="table-footer">
+          <span className="row-count">
+            Показано {((page - 1) * PAGE_SIZE) + 1}–{Math.min(page * PAGE_SIZE, sorted.length)} из {sorted.length}
+          </span>
+          <div className="pagination">
+            <button className="page-btn" disabled={page <= 1} onClick={() => goToPage(page - 1)}>‹</button>
+            {getPageNumbers(page, totalPages).map((p, idx) => (
+              <button key={typeof p === 'number' ? p : `e${idx}`} className={['page-btn', p === page ? 'page-active' : ''].filter(Boolean).join(' ')} onClick={() => typeof p === 'number' && goToPage(p)} disabled={typeof p !== 'number'}>
+                {p}
+              </button>
+            ))}
+            <button className="page-btn" disabled={page >= totalPages} onClick={() => goToPage(page + 1)}>›</button>
+          </div>
         </div>
+
+        {hasCustomOrder && (
+          <div className="col-order-bar">
+            <span>Нажмите на заголовок для сортировки · Перетаскивайте заголовки для изменения порядка колонок</span>
+            <button onClick={resetColumns} className="btn-reset-cols" title="Сбросить порядок колонок">↺ Сбросить</button>
+          </div>
+        )}
       </div>
     </div>
   )

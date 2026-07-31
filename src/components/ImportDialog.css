@@ -1,7 +1,7 @@
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.4);
+  background: rgba(0, 0, 0, .45);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -9,10 +9,10 @@
 }
 
 .modal {
-  background: var(--bg-secondary);
+  background: var(--surface);
   border-radius: 8px;
   max-width: 800px;
-  width: 90%;
+  width: 92%;
   max-height: 90vh;
   display: flex;
   flex-direction: column;
@@ -21,29 +21,27 @@
 
 .modal-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--border-light);
+  justify-content: space-between;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
 }
 
 .modal-header h2 {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 600;
 }
 
 .modal-close {
   background: none;
   border: none;
-  font-size: 24px;
+  font-size: 20px;
   cursor: pointer;
   color: var(--text-muted);
   padding: 0 4px;
+  line-height: 1;
 }
-
-.modal-close:hover {
-  color: var(--text);
-}
+.modal-close:hover { color: var(--text); }
 
 .drop-zone {
   margin: 16px 20px;
@@ -52,24 +50,24 @@
   border-radius: 8px;
   text-align: center;
   cursor: pointer;
-  transition: border-color 0.2s, background 0.2s;
+  transition: border-color .15s, background .15s;
 }
 
 .drop-zone:hover,
 .drop-zone.drag-over {
-  border-color: #1a73e8;
-  background: var(--hover-bg);
+  border-color: var(--accent);
+  background: var(--accent-light);
 }
 
 .drop-zone p {
   font-size: 14px;
   color: var(--text-muted);
+  margin-bottom: 4px;
 }
 
 .drop-zone .hint {
   font-size: 12px;
   color: var(--hint-color);
-  margin-top: 4px;
 }
 
 .import-status {
@@ -78,14 +76,8 @@
   color: var(--text-muted);
 }
 
-.import-status.ok {
-  color: #2e7d32;
-}
-
-.import-status.new {
-  color: #e65100;
-  font-weight: 600;
-}
+.import-status.ok { color: #16a34a; }
+.import-status.new { color: #ea580c; font-weight: 600; }
 
 .import-error {
   font-size: 13px;
@@ -99,43 +91,52 @@
   flex: 1;
 }
 
-.new-products-section {
-  margin-top: 8px;
-}
+.new-products-section { margin-top: 8px; }
 
 .new-products-section h3 {
   font-size: 14px;
   font-weight: 600;
   margin-bottom: 8px;
+  color: var(--text);
 }
 
 .new-products-scroll {
   max-height: 300px;
   overflow-y: auto;
   border: 1px solid var(--border-light);
-  border-radius: 4px;
+  border-radius: 5px;
 }
 
 .new-products-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: 12.5px;
 }
 
 .new-products-table th {
-  background: var(--hover-bg);
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5fb 100%);
   position: sticky;
   top: 0;
-  padding: 6px 8px;
+  padding: 8px 12px;
   text-align: left;
   font-weight: 600;
-  border-bottom: 1px solid var(--border);
+  font-size: 11.5px;
+  letter-spacing: .3px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  border-bottom: 2px solid var(--border);
+}
+
+body[data-theme='dark'] .new-products-table th {
+  background: linear-gradient(180deg, #1e2240 0%, #1a1d35 100%);
 }
 
 .new-products-table td {
-  padding: 4px 8px;
+  padding: 7px 12px;
   border-bottom: 1px solid var(--border-light);
 }
+
+.new-products-table tr:hover td { background: var(--row-hover); }
 
 .modal-actions {
   display: flex;
@@ -146,33 +147,29 @@
 }
 
 .modal-actions button {
-  padding: 8px 16px;
-  border-radius: 4px;
+  padding: 7px 16px;
+  border-radius: 5px;
   font-size: 13px;
   cursor: pointer;
-  border: 1px solid var(--input-border);
+  font-family: inherit;
 }
 
 .btn-cancel {
-  background: var(--bg-secondary);
+  background: var(--surface);
   color: var(--text);
+  border: 1px solid var(--input-border);
 }
+.btn-cancel:hover { background: var(--hover-bg); }
 
 .btn-confirm {
-  background: #2e7d32;
+  background: #16a34a;
   color: white;
-  border-color: #2e7d32 !important;
+  border: none;
+  font-weight: 500;
 }
-
-.btn-confirm:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
+.btn-confirm:hover:not(:disabled) { background: #15803d; }
+.btn-confirm:disabled { opacity: .5; cursor: not-allowed; }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
+  *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
 }
