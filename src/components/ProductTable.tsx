@@ -57,12 +57,15 @@ export default function ProductTable({ rows, onEdit, onAdd }: Props) {
   return (
     <div className="table-container">
       <div className="toolbar">
+        <label className="sr-only" htmlFor="product-search">Поиск</label>
         <input
+          id="product-search"
           type="text"
           placeholder="Поиск по всем полям..."
           value={search}
           onChange={e => { setSearch(e.target.value); setPage(1) }}
           className="search-input"
+          aria-label="Поиск товаров"
         />
         {onAdd && (
           <button onClick={onAdd} className="btn-add">

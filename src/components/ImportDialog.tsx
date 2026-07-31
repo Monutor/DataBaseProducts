@@ -89,8 +89,8 @@ export default function ImportDialog({ rows, onConfirm, onCancel }: Props) {
   }
 
   return (
-    <div className="modal-overlay" onClick={onCancel} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onCancel() }}>
-      <div className="modal" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true">
+    <button type="button" className="modal-overlay" onClick={onCancel}>
+      <div className="modal" role="dialog" aria-modal="true">
         <div className="modal-header">
           <h2>Импорт товаров</h2>
           <button className="modal-close" onClick={onCancel}>&times;</button>
@@ -107,9 +107,11 @@ export default function ImportDialog({ rows, onConfirm, onCancel }: Props) {
           <p className="hint">или нажмите для выбора файла</p>
           <input
             ref={inputRef}
+            id="import-file-input"
             type="file"
             accept=".csv,.xlsx,.xls"
             hidden
+            aria-label="Выбрать файл для импорта"
             onChange={onFileSelect}
           />
         </div>
@@ -172,6 +174,6 @@ export default function ImportDialog({ rows, onConfirm, onCancel }: Props) {
           </button>
         </div>
       </div>
-    </div>
+    </button>
   )
 }

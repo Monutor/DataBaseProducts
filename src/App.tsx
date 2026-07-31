@@ -61,11 +61,21 @@ function getSavedPassword(): string | null {
 
 export default function App() {
   const savedPw = getSavedPassword()
+  const THEME_KEY = 'theme'
   const [adminMode, setAdminMode] = useState(() => IS_DEV)
   const [showAdminLogin, setShowAdminLogin] = useState(false)
   const [passwordInput, setPasswordInput] = useState(savedPw || '')
   const [passwordError, setPasswordError] = useState(false)
   const [remember, setRemember] = useState(!!savedPw)
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    const saved = localStorage.getItem(THEME_KEY) as 'light' | 'dark' | null
+    return saved === 'dark' ? 'dark' : 'light'
+  })
+
+  useEffect(() => {
+    document.body.setAttribute('data-theme', theme)
+    localStorage.setItem(THEME_KEY, theme)
+  }, [theme])
   const [ghToken, setGhToken] = useState(() => localStorage.getItem('gh_token') || '')
   const [ghTokenInput, setGhTokenInput] = useState('')
   const [sewToken, setSewTokenState] = useState(() => (localStorage.getItem('sew_token') || '').trim())
@@ -245,6 +255,9 @@ export default function App() {
           <button onClick={() => setShowImportHistory(true)} className="btn-history" title="История импортов">
             📋 История
           </button>
+          <button className="btn-theme-toggle" onClick={() => setTheme(t => t === 'light' ? 'dark' : 'light')} title={theme === 'light' ? 'Тёмная тема' : 'Светлая тема'} aria-label={theme === 'light' ? 'Переключить на тёмную тему' : 'Переключить на светлую тему'}>
+            {theme === 'light' ? '🌙' : '☀️'}
+          </button>
           <button className="btn-admin-toggle" onClick={() => { if (adminMode) { setAdminMode(false) } else if (IS_DEV) { setAdminMode(true) } else { setShowAdminLogin(true) } }}>
             ⚙️
           </button>
@@ -257,11 +270,33 @@ export default function App() {
                 {sewLoading ? '⏳' : '📥'} Загрузить с SEW
               </button>
               <div className="admin-token-section">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  {ghToken ? (<><span style={{ fontSize:'12px', color:'#4caf50' }}>GH OK</span><button onClick={() => { setGhToken(''); localStorage.removeItem('gh_token'); setSha('') }} className="btn-clear-token">✕</button></>) : (<><input type="password" placeholder="GH Token" value={ghTokenInput} onChange={e => setGhTokenInput(e.target.value)} className="admin-token-input" autoComplete="new-password" /><button className="btn-token-save" onClick={() => { setGhToken(ghTokenInput); localStorage.setItem('gh_token', ghTokenInput); loadAdminData() }}>OK</button></>)}
+                <div className="token-row">
+                  {ghToken ? (
+                    <>
+                      <span className="token-status-ok" title="GitHub токен сохранён">✓ GitHub</span>
+                      <button type="button" className="btn-token-clear" onClick={() => { setGhToken(''); localStorage.removeItem('gh_token'); setSha('') }} aria-label="Удалить GitHub токен">✕</button>
+                    </>
+                  ) : (
+                    <label className="token-field">
+                      <span className="sr-only">GitHub токен</span>
+                      <input type="password" placeholder="GitHub Token" value={ghTokenInput} onChange={e => setGhTokenInput(e.target.value)} className="admin-token-input" autoComplete="new-password" aria-label="GitHub токен доступа" />
+                      <button type="button" className="btn-token-save" onClick={() => { setGhToken(ghTokenInput); localStorage.setItem('gh_token', ghTokenInput); loadAdminData() }}>OK</button>
+                    </label>
+                  )}
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  {sewToken ? (<><span style={{ fontSize:'12px', color:'#4caf50' }}>SEW OK</span><button onClick={() => { setSewTokenState(''); localStorage.removeItem('sew_token') }} className="btn-clear-token">✕</button></>) : (<><input type="password" placeholder="SEW Token" value={sewTokenInput} onChange={e => setSewTokenInput(e.target.value)} className="admin-token-input" autoComplete="new-password" style={{ width:'120px' }} /><button className="btn-token-save" onClick={() => { if (sewTokenInput.trim()) { localStorage.setItem('sew_token', sewTokenInput.trim()); setSewTokenState(sewTokenInput.trim()) } }}>OK</button></>)}
+                <div className="token-row">
+                  {sewToken ? (
+                    <>
+                      <span className="token-status-ok" title="SEW токен сохранён">✓ SEW</span>
+                      <button type="button" className="btn-token-clear" onClick={() => { setSewTokenState(''); localStorage.removeItem('sew_token') }} aria-label="Удалить SEW токен">✕</button>
+                    </>
+                  ) : (
+                    <label className="token-field">
+                      <span className="sr-only">SEW токен</span>
+                      <input type="password" placeholder="SEW Token" value={sewTokenInput} onChange={e => setSewTokenInput(e.target.value)} className="admin-token-input" autoComplete="new-password" aria-label="SEW токен доступа" />
+                      <button type="button" className="btn-token-save" onClick={() => { if (sewTokenInput.trim()) { localStorage.setItem('sew_token', sewTokenInput.trim()); setSewTokenState(sewTokenInput.trim()) } }}>OK</button>
+                    </label>
+                  )}
                 </div>
               </div>
               <button className="btn-logout" onClick={() => { setAdminMode(false); setGhToken(''); setSewTokenState(''); localStorage.removeItem('gh_token'); localStorage.removeItem('sew_token') }}>
@@ -292,8 +327,8 @@ export default function App() {
       {showImport && <ImportDialog rows={rows} onConfirm={handleImport} onCancel={() => setShowImport(false)} />}
 
        {sewPreviewRows.length > 0 && (
-        <div className="modal-overlay" onClick={() => setSewPreviewRows([])} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSewPreviewRows([]) }}>
-          <div className="modal" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true">
+        <button type="button" className="modal-overlay" onClick={() => setSewPreviewRows([])}>
+          <div className="modal" role="dialog" aria-modal="true">
             <div className="modal-header">
               <h2>Новые товары из SEW</h2>
               <button className="modal-close" onClick={() => setSewPreviewRows([])}>&times;</button>
@@ -344,12 +379,12 @@ export default function App() {
               }}>Добавить {sewPreviewRows.length} новых товаров</button>
             </div>
           </div>
-        </div>
+        </button>
       )}
 
       {showImportHistory && (
-        <div className="modal-overlay" onClick={() => setShowImportHistory(false)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setShowImportHistory(false) }}>
-          <div className="modal import-history-modal" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true">
+        <button type="button" className="modal-overlay" onClick={() => setShowImportHistory(false)}>
+          <div className="modal import-history-modal" role="dialog" aria-modal="true">
             <div className="modal-header">
               <h2>История импортов</h2>
               <button className="modal-close" onClick={() => setShowImportHistory(false)}>&times;</button>
@@ -381,12 +416,12 @@ export default function App() {
               <button className="btn-cancel" onClick={() => setShowImportHistory(false)}>Закрыть</button>
             </div>
           </div>
-        </div>
+        </button>
       )}
 
       {showAdminLogin && (
-        <div className="modal-overlay" onClick={() => { setShowAdminLogin(false); setPasswordError(false) }} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { setShowAdminLogin(false); setPasswordError(false) } }}>
-          <div className="modal admin-login-modal" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true">
+        <button type="button" className="modal-overlay" onClick={() => { setShowAdminLogin(false); setPasswordError(false) }}>
+          <div className="modal admin-login-modal" role="dialog" aria-modal="true">
             <div className="modal-header">
               <h2>Вход в админ-панель</h2>
               <button className="modal-close" onClick={() => { setShowAdminLogin(false); setPasswordError(false) }}>&times;</button>
@@ -394,14 +429,14 @@ export default function App() {
             <div className="admin-login-content">
               <input type="password" placeholder="Пароль администратора" value={passwordInput} onChange={e => { setPasswordInput(e.target.value); setPasswordError(false) }} onKeyDown={e => { if(e.key === 'Enter') doUnlock() }} autoFocus aria-label="Пароль администратора" />
               {passwordError && <p className="hint" style={{ color:'#c62828', textAlign:'center' }}>Неверный пароль</p>}
-              <label className="remember-row"><input type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)} /> Запомнить пароль на 2 дня</label>
+               <label className="remember-row"><input id="remember-pw" type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)} /> Запомнить пароль на 2 дня</label>
             </div>
             <div className="modal-actions">
               <button className="btn-cancel" onClick={() => { setShowAdminLogin(false); setPasswordError(false) }}>Отмена</button>
               <button className="btn-confirm" onClick={doUnlock}>Войти</button>
             </div>
           </div>
-        </div>
+        </button>
       )}
 
       <footer className="app-footer">

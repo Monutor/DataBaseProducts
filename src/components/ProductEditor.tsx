@@ -73,8 +73,8 @@ export default function ProductEditor({ row, onSave, onCancel }: Props) {
   }
 
   return (
-    <div className="modal-overlay" onClick={onCancel} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onCancel() }}>
-      <div className="modal" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true">
+    <button type="button" className="modal-overlay" onClick={onCancel}>
+      <div className="modal" role="dialog" aria-modal="true">
         <h2>{row ? 'Редактировать товар' : 'Добавить товар'}</h2>
         <div className="form-grid">
           {FIELDS.map(f => (
@@ -105,6 +105,6 @@ export default function ProductEditor({ row, onSave, onCancel }: Props) {
           </button>
         </div>
       </div>
-    </div>
+    </button>
   )
 }

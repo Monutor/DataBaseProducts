@@ -26,3 +26,8 @@ dist-ssr
 
 scripts/
 docs
+
+# AI agent instructions (local use only)
+AGENTS.md
+opencode.json
+opencode.jsonc

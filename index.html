@@ -6,8 +6,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Админ-панель — База данных товаров магазина S187</title>
   </head>
-  <body>
+  <body data-theme="light">
     <div id="root"></div>
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(t==='dark')document.body.setAttribute('data-theme','dark');})();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
