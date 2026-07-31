@@ -96,7 +96,7 @@ export default function ImportDialog({ rows, onConfirm, onCancel }: Props) {
 
   return (
     <div className="modal-overlay" onClick={onCancel}>
-      <div className="modal" role="dialog" aria-modal="true">
+      <div className="modal" role="dialog" aria-modal="true" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <h2>Импорт товаров</h2>
           <button type="button" className="modal-close" onClick={onCancel}>&times;</button>

@@ -327,10 +327,10 @@ export default function App() {
       {showImport && <ImportDialog rows={rows} onConfirm={handleImport} onCancel={() => setShowImport(false)} />}
 
        {sewPreviewRows.length > 0 && (
-        <div className="modal-overlay" onClick={() => setSewPreviewRows([])}>
-          <div className="modal" role="dialog" aria-modal="true">
-            <div className="modal-header">
-              <h2>Новые товары из SEW</h2>
+         <div className="modal-overlay" onClick={() => setSewPreviewRows([])}>
+           <div className="modal" role="dialog" aria-modal="true" onClick={e => e.stopPropagation()}>
+             <div className="modal-header">
+               <h2>Новые товары из SEW</h2>
               <button type="button" className="modal-close" onClick={() => setSewPreviewRows([])}>&times;</button>
             </div>
             <div className="import-results">
@@ -384,7 +384,7 @@ export default function App() {
 
       {showImportHistory && (
         <div className="modal-overlay" onClick={() => setShowImportHistory(false)}>
-          <div className="modal import-history-modal" role="dialog" aria-modal="true">
+          <div className="modal import-history-modal" role="dialog" aria-modal="true" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h2>История импортов</h2>
               <button type="button" className="modal-close" onClick={() => setShowImportHistory(false)}>&times;</button>
@@ -421,7 +421,7 @@ export default function App() {
 
       {showAdminLogin && (
         <div className="modal-overlay" onClick={() => { setShowAdminLogin(false); setPasswordError(false) }}>
-          <div className="modal admin-login-modal" role="dialog" aria-modal="true">
+          <div className="modal admin-login-modal" role="dialog" aria-modal="true" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h2>Вход в админ-панель</h2>
               <button type="button" className="modal-close" onClick={() => { setShowAdminLogin(false); setPasswordError(false) }}>&times;</button>

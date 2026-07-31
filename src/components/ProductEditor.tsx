@@ -80,7 +80,7 @@ export default function ProductEditor({ row, onSave, onCancel }: Props) {
 
   return (
     <div className="modal-overlay" onClick={onCancel}>
-      <div className="modal" role="dialog" aria-modal="true">
+      <div className="modal" role="dialog" aria-modal="true" onClick={e => e.stopPropagation()}>
         <h2>{row ? 'Редактировать товар' : 'Добавить товар'}</h2>
         <div className="form-grid">
           {FIELDS.map(f => (
