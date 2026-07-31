@@ -252,7 +252,7 @@ export default function App() {
           <button onClick={() => setShowImport(true)} disabled={loading} className="btn-import">
             📥 Импорт
           </button>
-          <button onClick={() => setShowImportHistory(true)} className="btn-history" title="История импортов">
+          <button onClick={() => setShowImportHistory(true)} className="btn btn-history" title="История импортов">
             📋 История
           </button>
           <button className="btn-theme-toggle" onClick={() => setTheme(t => t === 'light' ? 'dark' : 'light')} title={theme === 'light' ? 'Тёмная тема' : 'Светлая тема'} aria-label={theme === 'light' ? 'Переключить на тёмную тему' : 'Переключить на светлую тему'}>
@@ -263,10 +263,10 @@ export default function App() {
           </button>
           {adminMode && (
             <>
-              <button onClick={() => handleSaveToGitHub(rows)} disabled={saving || loading || rows.length === 0 || !ghToken || !sha} className="btn-save-github">
+              <button onClick={() => handleSaveToGitHub(rows)} disabled={saving || loading || rows.length === 0 || !ghToken || !sha} className="btn btn-save-github">
                 💾 Сохранить в GitHub
               </button>
-              <button onClick={handleSEWLoad} disabled={sewLoading || !sewToken.trim()} className="btn-sew-load" title="Загрузить данные с SEW API">
+              <button onClick={handleSEWLoad} disabled={sewLoading || !sewToken.trim()} className="btn btn-sew-load" title="Загрузить данные с SEW API">
                 {sewLoading ? '⏳' : '📥'} Загрузить с SEW
               </button>
               <div className="admin-token-section">
@@ -299,7 +299,7 @@ export default function App() {
                   )}
                 </div>
               </div>
-              <button className="btn-logout" onClick={() => { setAdminMode(false); setGhToken(''); setSewTokenState(''); localStorage.removeItem('gh_token'); localStorage.removeItem('sew_token') }}>
+              <button className="btn btn-logout" onClick={() => { setAdminMode(false); setGhToken(''); setSewTokenState(''); localStorage.removeItem('gh_token'); localStorage.removeItem('sew_token') }}>
                 Выйти
               </button>
             </>
