@@ -117,8 +117,7 @@ export default function ProductTable({ rows, onEdit, onAdd }: Props) {
     if (terms.length === 0) return rows
     return rows.filter(r =>
       terms.some(term =>
-        String(r['Код товара'] || '').toLowerCase().includes(term) ||
-        String(r['ШК товара'] || '').toLowerCase().includes(term)
+        Object.values(r).some(v => String(v || '').toLowerCase().includes(term))
       )
     )
   }, [rows, search])
