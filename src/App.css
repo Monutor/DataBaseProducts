@@ -165,7 +165,7 @@ body {
 .btn-primary:hover:not(:disabled) { background: #2563eb; border-color: #2563eb; }
 
 /* ── Color actions ─────────────────── */
-.btn-save-github  { background: #16a34a !important; color: #fff !important; border-color: #16a34a !important; }
+.btn-save-github  { background: #16a34a !important; color: #fff !important; border-color: #16a34a !important; margin-left: auto; }
 .btn-save-github:hover:not(:disabled) { background: #15803d !important; }
 
 .btn-import       { background: #ea580c !important; color: #fff !important; border-color: #ea580c !important; }
