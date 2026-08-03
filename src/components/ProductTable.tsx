@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import type { ProductRow } from '../csv/types'
 import './ProductTable.css'
 
@@ -46,6 +46,7 @@ function escapeHtml(s: string): string {
 
 export default function ProductTable({ rows, onEdit, onAdd }: Props) {
   const [search, setSearch] = useState('')
+  const searchRef = useRef<HTMLTextAreaElement>(null)
   const [sortKey, setSortKey] = useState<keyof ProductRow>('Код товара')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [page, setPage] = useState(1)
@@ -65,6 +66,13 @@ export default function ProductTable({ rows, onEdit, onAdd }: Props) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows.length])
 
+  useEffect(() => {
+    const el = searchRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${Math.min(el.scrollHeight, 200)}px`
+  }, [search])
+
   const headers = columnOrder.filter(h => Object.keys(rows[0] || {}).includes(h))
 
   const [dragSourceIndex, setDragSourceIndex] = useState<number | null>(null)
@@ -73,6 +81,19 @@ export default function ProductTable({ rows, onEdit, onAdd }: Props) {
   const handleSort = (key: keyof ProductRow) => {
     if (key === sortKey) setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))
     else { setSortKey(key); setSortDir('asc') }
+  }
+
+  const addSearchTerm = (term: string) => {
+    if (!term.trim()) return
+    const currentTerms = search.split(',').map(t => t.trim()).filter(Boolean)
+    const idx = currentTerms.indexOf(term)
+    if (idx >= 0) {
+      currentTerms.splice(idx, 1)
+    } else {
+      currentTerms.push(term)
+    }
+    setSearch(currentTerms.join(', '))
+    setPage(1)
   }
 
   const goToPage = (p: number) => setPage(Math.max(1, Math.min(p, totalPages)))
@@ -127,7 +148,7 @@ export default function ProductTable({ rows, onEdit, onAdd }: Props) {
     const terms = search.split(',').map(t => t.trim().toLowerCase()).filter(Boolean)
     if (terms.length === 0) return rows
     return rows.filter(r =>
-      terms.some(term =>
+      terms.every(term =>
         Object.values(r).some(v => String(v || '').toLowerCase().includes(term))
       )
     )
@@ -157,10 +178,10 @@ export default function ProductTable({ rows, onEdit, onAdd }: Props) {
             <circle cx="11" cy="11" r="8"/>
             <path d="m21 21-4.35-4.35"/>
           </svg>
-          <input
+          <textarea
+            ref={searchRef}
             id="product-search"
-            type="text"
-            placeholder="Поиск по всем полям… (запятая — несколько запросов)"
+            placeholder="Название, код или бренд… (через запятую для нескольких)"
             value={search}
             onChange={e => { setSearch(e.target.value); setPage(1) }}
             className="search-input"
@@ -217,31 +238,32 @@ export default function ProductTable({ rows, onEdit, onAdd }: Props) {
                   <tr key={`${row['Код товара'] || 'no-code'}-${i}`}>
                     {headers.map(h => {
                       const val = String(row[h as keyof ProductRow] ?? '')
+                      const cellText = String(val ?? '')
                       if (h === 'STOPSALE') {
                         return (
-                          <td key={h}>
-                            {val === 'Да'
+                          <td key={h} onClick={() => addSearchTerm(cellText)} className="clickable-cell" title="Нажмите, чтобы добавить в поиск">
+                            {cellText === 'Да'
                               ? <span className="badge-yes badge-stop">Да</span>
-                              : val}
+                              : cellText}
                           </td>
                         )
                       }
                       if (h === 'ONLINE-ONLY') {
                         return (
-                          <td key={h}>
-                            {val === 'Да'
+                          <td key={h} onClick={() => addSearchTerm(cellText)} className="clickable-cell" title="Нажмите, чтобы добавить в поиск">
+                            {cellText === 'Да'
                               ? <span className="badge-yes badge-online">Да</span>
-                              : val}
+                              : cellText}
                           </td>
                         )
                       }
                       if (h === 'Код товара') {
-                        return <td key={h} dangerouslySetInnerHTML={{ __html: highlight(val, search) }} />
+                        return <td key={h} onClick={() => addSearchTerm(cellText)} className="clickable-cell" title="Нажмите, чтобы добавить в поиск" dangerouslySetInnerHTML={{ __html: highlight(val, search) }} />
                       }
                       if (search && !['STOPSALE', 'ONLINE-ONLY'].includes(h)) {
-                        return <td key={h} dangerouslySetInnerHTML={{ __html: highlight(val, search) }} />
+                        return <td key={h} onClick={() => addSearchTerm(cellText)} className="clickable-cell" title="Нажмите, чтобы добавить в поиск" dangerouslySetInnerHTML={{ __html: highlight(val, search) }} />
                       }
-                      return <td key={h}>{val}</td>
+                      return <td key={h} onClick={() => addSearchTerm(cellText)} className="clickable-cell" title="Нажмите, чтобы добавить в поиск">{cellText}</td>
                     })}
                     {onEdit && (
                       <td>
