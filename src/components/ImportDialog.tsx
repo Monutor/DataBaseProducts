@@ -8,6 +8,7 @@ interface Props {
   rows: ProductRow[]
   onConfirm: (newRows: ProductRow[]) => void
   onCancel: () => void
+  onError?: (msg: string) => void
 }
 
 const EXISTING_ARTICLE = 'Код товара'
@@ -21,11 +22,14 @@ function readFileAsBuffer(file: File): Promise<ArrayBuffer> {
   })
 }
 
-export default function ImportDialog({ rows, onConfirm, onCancel }: Props) {
+export default function ImportDialog({ rows, onConfirm, onCancel, onError }: Props) {
   const [dragOver, setDragOver] = useState(false)
   const [parsed, setParsed] = useState<ProductRow[] | null>(null)
   const [loading, setLoading] = useState(false)
   const [parseError, setParseError] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [saveError, setSaveError] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
 
   const existingArticles = useMemo(() => {
@@ -75,6 +79,22 @@ export default function ImportDialog({ rows, onConfirm, onCancel }: Props) {
     setLoading(false)
   }
 
+  const handleConfirm = async () => {
+    if (!parsed || newRows.length === 0) return
+    setSaving(true)
+    try {
+      await onConfirm(newRows)
+      setSaved(true)
+      setTimeout(() => onCancel(), 1200)
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Неизвестная ошибка'
+      setSaveError(msg)
+      if (onError) onError(msg)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault()
     setDragOver(false)
@@ -89,96 +109,129 @@ export default function ImportDialog({ rows, onConfirm, onCancel }: Props) {
   }
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onCancel() }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !saving) onCancel() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onCancel])
+  }, [onCancel, saving])
 
   return (
-    <div className="modal-overlay" onClick={onCancel}>
+    <div className="modal-overlay" onClick={saved || saving ? undefined : onCancel}>
       <div className="modal" role="dialog" aria-modal="true" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <h2>Импорт товаров</h2>
-          <button type="button" className="modal-close" onClick={onCancel}>&times;</button>
+          {!saving && !saved && (
+            <button type="button" className="modal-close" onClick={onCancel}>&times;</button>
+          )}
         </div>
 
-        <div
-          className={`drop-zone${dragOver ? ' drag-over' : ''}`}
-          onDragOver={e => { e.preventDefault(); setDragOver(true) }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={onDrop}
-          onClick={() => inputRef.current?.click()}
-        >
-          <p>Перетащите CSV или XLSX файл сюда</p>
-          <p className="hint">или нажмите для выбора файла</p>
-          <input
-            ref={inputRef}
-            id="import-file-input"
-            type="file"
-            accept=".csv,.xlsx,.xls"
-            hidden
-            aria-label="Выбрать файл для импорта"
-            onChange={onFileSelect}
-          />
-        </div>
-
-        {loading && <p className="import-status">Парсинг файла...</p>}
-        {parseError && <p className="import-error">{parseError}</p>}
-
-        {parsed && (
-          <div className="import-results">
-            <p className="import-status ok">
-              Загружено строк: {parsed.length}
-            </p>
-            <p className={`import-status ${newRows.length > 0 ? 'new' : 'ok'}`}>
-              Из них новых товаров: {newRows.length}
-            </p>
-
-            {newRows.length > 0 && (
-              <div className="new-products-section">
-                <h3>Новые товары</h3>
-                <div className="new-products-scroll">
-                  <table className="new-products-table">
-                    <thead>
-                      <tr>
-                        <th>Код товара</th>
-                        <th>Наименование</th>
-                        <th>Количество</th>
-                        <th>Бренд</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {newRows.slice(0, 200).map((r, i) => (
-                        <tr key={`${r['Код товара'] || 'no-code'}-${i}`}>
-                          <td>{r['Код товара']}</td>
-                          <td>{r['Наименование']}</td>
-                          <td>{r['Количество']}</td>
-                          <td>{r['Бренд']}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {newRows.length > 200 && (
-                    <p className="hint">... и ещё {newRows.length - 200} товаров</p>
-                  )}
-                </div>
-              </div>
-            )}
+        {(!loading && !saving && !parsed) && (
+          <div
+            className={`drop-zone${dragOver ? ' drag-over' : ''}`}
+            onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={onDrop}
+            onClick={() => inputRef.current?.click()}
+          >
+            <p>Перетащите CSV или XLSX файл сюда</p>
+            <p className="hint">или нажмите для выбора файла</p>
+            <input
+              ref={inputRef}
+              id="import-file-input"
+              type="file"
+              accept=".csv,.xlsx,.xls"
+              hidden
+              aria-label="Выбрать файл для импорта"
+              onChange={onFileSelect}
+            />
           </div>
         )}
 
-        <div className="modal-actions">
-          <button className="btn-cancel" onClick={onCancel}>Отмена</button>
-          <button
-            className="btn-confirm"
-            disabled={!parsed || newRows.length === 0}
-            onClick={() => onConfirm(newRows)}
-          >
-            {newRows.length > 0
-              ? `Добавить ${newRows.length} новых товаров`
-              : parsed ? 'Новых товаров нет' : 'Импортировать'}
-          </button>
-        </div>
+        {loading && (
+          <div className="progress-section">
+            <p className="import-status">Парсинг файла…</p>
+            <div className="progress-bar"><div className="progress-fill animating" /></div>
+          </div>
+        )}
+
+        {parseError && <p className="import-error">{parseError}</p>}
+
+        {parsed && !saving && (
+          <>
+            <div className="import-results">
+              <p className="import-status ok">
+                Загружено строк: {parsed.length}
+              </p>
+              <p className={`import-status ${newRows.length > 0 ? 'new' : 'ok'}`}>
+                Из них новых товаров: {newRows.length}
+              </p>
+
+              {newRows.length > 0 && (
+                <div className="new-products-section">
+                  <h3>Новые товары</h3>
+                  <div className="new-products-scroll">
+                    <table className="new-products-table">
+                      <thead>
+                        <tr>
+                          <th>Код товара</th>
+                          <th>Наименование</th>
+                          <th>Количество</th>
+                          <th>Бренд</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {newRows.slice(0, 200).map((r, i) => (
+                          <tr key={`${r['Код товара'] || 'no-code'}-${i}`}>
+                            <td>{r['Код товара']}</td>
+                            <td>{r['Наименование']}</td>
+                            <td>{r['Количество']}</td>
+                            <td>{r['Бренд']}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {newRows.length > 200 && (
+                      <p className="hint">... и ещё {newRows.length - 200} товаров</p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {saving && (
+          <div className="progress-section">
+            <p className="import-status">Сохранение в репозиторий…</p>
+            <div className="progress-bar"><div className="progress-fill animating" /></div>
+          </div>
+        )}
+
+        {saved && (
+          <div className="progress-section">
+            <p className="import-status ok">✓ Сохранено! ({newRows.length} товаров добавлено)</p>
+          </div>
+        )}
+
+        {saveError && (
+          <div className="progress-section">
+            <p className="import-error">Ошибка сохранения: {saveError}</p>
+          </div>
+        )}
+
+        {!saving && !saved && (
+          <div className="modal-actions">
+            <button className="btn-cancel" onClick={onCancel}>Отмена</button>
+            <button
+              className="btn-confirm"
+              disabled={!parsed || newRows.length === 0}
+              onClick={handleConfirm}
+            >
+              {newRows.length > 0
+                ? `Добавить ${newRows.length} новых товаров`
+                : parsed ? 'Новых товаров нет' : 'Импортировать'}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )

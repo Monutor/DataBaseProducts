@@ -181,17 +181,10 @@ export default function App() {
     setImportHistory(loadImportHistory())
     const updated = [...rows, ...newRows]
     setRows(updated)
-    setShowImport(false)
     try {
-      setSaving(true)
-      setError('')
-      setSuccess('')
       await commitPublicJSON(JSON.stringify(updated, null, 2), '[Import] Добавление товаров')
-      setSuccess('Добавлено ' + newRows.length + ' ' + declension(newRows.length, ['товар', 'товара', 'товаров']))
     } catch (e: unknown) {
-      setError('Ошибка сохранения: ' + (e instanceof Error ? e.message : 'Неизвестная ошибка'))
-    } finally {
-      setSaving(false)
+      throw new Error('Ошибка сохранения: ' + (e instanceof Error ? e.message : 'Неизвестная ошибка'))
     }
   }
 
@@ -324,7 +317,13 @@ export default function App() {
         <ProductEditor row={editorRow && Object.keys(editorRow).length > 0 ? editorRow : null} onSave={handleEditorSave} onCancel={() => setEditorRow(undefined)} />
       )}
 
-      {showImport && <ImportDialog rows={rows} onConfirm={handleImport} onCancel={() => setShowImport(false)} />}
+      {showImport && (
+        <ImportDialog
+          rows={rows}
+          onConfirm={handleImport}
+          onCancel={() => setShowImport(false)}
+        />
+      )}
 
        {sewPreviewRows.length > 0 && (
          <div className="modal-overlay" onClick={() => setSewPreviewRows([])}>
