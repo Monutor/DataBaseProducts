@@ -72,12 +72,6 @@
   color: var(--text-faint, #9ba3bc);
 }
 
-.toolbar .search-input:focus {
-  outline: none;
-  border-color: var(--accent, #3b82f6);
-  box-shadow: 0 0 0 3px rgba(59,130,246,.15);
-}
-
 .btn-clear-search {
   position: absolute;
   right: 5px;

@@ -6,6 +6,7 @@ interface Props {
   row: ProductRow | null
   onSave: (row: ProductRow) => void
   onCancel: () => void
+  error?: string
 }
 
 const FIELDS: (keyof ProductRow)[] = [
@@ -37,7 +38,7 @@ const TIMESTAMP_FIELDS: (keyof ProductRow)[] = [
   'Последнее изменение МСК',
 ]
 
-export default function ProductEditor({ row, onSave, onCancel }: Props) {
+export default function ProductEditor({ row, onSave, onCancel, error }: Props) {
   const emptyRow = Object.fromEntries(
     [...FIELDS, ...TIMESTAMP_FIELDS].map(f => [f, ''])
   ) as unknown as ProductRow
@@ -88,7 +89,7 @@ export default function ProductEditor({ row, onSave, onCancel }: Props) {
               <span>{f}:</span>
               <input
                 type="text"
-                value={form[f]}
+                value={form[f] ?? ''}
                 onChange={e => set(f, e.target.value)}
               />
             </label>
@@ -102,6 +103,7 @@ export default function ProductEditor({ row, onSave, onCancel }: Props) {
             </small>
           </div>
         )}
+        {error && <p className="editor-error">{error}</p>}
         <div className="modal-actions">
           <button onClick={onCancel} className="btn-cancel">
             Отмена

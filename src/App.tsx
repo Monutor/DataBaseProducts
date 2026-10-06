@@ -1,5 +1,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { fetchPublicJSON, commitPublicJSON, fetchJSON, commitJSON } from './github/api'
+import { filterNewRows } from './shared/parser'
+import { useEscapeClose } from './hooks/useEscapeClose'
 import type { ProductRow } from './csv/types'
 import ProductTable from './components/ProductTable'
 import ProductEditor from './components/ProductEditor'
@@ -60,9 +62,9 @@ function getSavedPassword(): string | null {
 }
 
 export default function App() {
-  const savedPw = getSavedPassword()
+  const [savedPw] = useState(() => getSavedPassword())
   const THEME_KEY = 'theme'
-  const [adminMode, setAdminMode] = useState(() => IS_DEV)
+  const [adminMode, setAdminMode] = useState(() => IS_DEV || !!savedPw)
   const [showAdminLogin, setShowAdminLogin] = useState(false)
   const [passwordInput, setPasswordInput] = useState(savedPw || '')
   const [passwordError, setPasswordError] = useState(false)
@@ -111,7 +113,10 @@ export default function App() {
   }, [])
 
   const loadAdminData = useCallback(async () => {
-    if (!ghToken) return
+    if (!ghToken) {
+      setError('Нужен GitHub-токен для загрузки данных из репозитория. Введите его в шапке.')
+      return
+    }
     setLoading(true)
     setError('')
     setSuccess('')
@@ -128,7 +133,14 @@ export default function App() {
     }
   }, [ghToken])
 
-  useEffect(() => { loadPublicData() }, [loadPublicData])
+useEffect(() => {
+    if (adminMode && ghToken) loadAdminData()
+    else loadPublicData()
+  }, [adminMode, ghToken, loadAdminData, loadPublicData])
+
+  useEscapeClose(() => { setShowAdminLogin(false); setPasswordError(false) }, showAdminLogin)
+  useEscapeClose(() => setSewPreviewRows([]), sewPreviewRows.length > 0 && !saving)
+  useEscapeClose(() => setShowImportHistory(false), showImportHistory)
 
   const handleSaveToGitHub = async (updated: ProductRow[]) => {
     if (!ghToken || !sha) {
@@ -156,16 +168,24 @@ export default function App() {
   }
 
   const handleEdit = (index: number, row: ProductRow) => {
+    setError('')
     setEditIndex(index)
     setEditorRow(row)
   }
 
   const handleAdd = () => {
+    setError('')
     setEditIndex(null)
     setEditorRow({} as ProductRow)
   }
 
   const handleEditorSave = (row: ProductRow) => {
+    const code = (row['Код товара'] ?? '').trim()
+    if (code && rows.some((r, i) => i !== editIndex && (r['Код товара'] ?? '').trim() === code)) {
+      setError('Товар с кодом «' + code + '» уже есть в базе')
+      return
+    }
+    setError('')
     const updated = [...rows]
     if (editIndex !== null) {
       updated[editIndex] = row
@@ -177,14 +197,25 @@ export default function App() {
   }
 
   const handleImport = async (newRows: ProductRow[], source: 'file' | 'sew' = 'file') => {
+    setError('')
+    setSuccess('')
+    const updated = [...rows, ...newRows]
+    const message = source === 'sew'
+      ? '[Import] Добавление товаров из SEW'
+      : '[Import] Добавление товаров'
+    setSaving(true)
+    try {
+      await commitPublicJSON(JSON.stringify(updated, null, 2), message)
+    } finally {
+      setSaving(false)
+    }
+    setRows(updated)
     addImportEntry(source, newRows.length)
     setImportHistory(loadImportHistory())
-    const updated = [...rows, ...newRows]
-    setRows(updated)
-    try {
-      await commitPublicJSON(JSON.stringify(updated, null, 2), '[Import] Добавление товаров')
-    } catch (e: unknown) {
-      throw new Error('Ошибка сохранения: ' + (e instanceof Error ? e.message : 'Неизвестная ошибка'))
+    setSuccess('Добавлено ' + newRows.length + ' ' + declension(newRows.length, ['товар', 'товара', 'товаров']))
+    if (ghToken) {
+      const result = await fetchJSON(ghToken).catch(() => null)
+      if (result) setSha(result.sha)
     }
   }
 
@@ -203,11 +234,8 @@ export default function App() {
       return
     }
 
-    const existingArticles = new Set(rows.map(r => r['Код товара']?.trim()).filter(Boolean))
-    const newRows = result.rows.filter((r: ProductRow) => {
-      const code = r['Код товара']?.trim()
-      return code && !existingArticles.has(code)
-    })
+    const existingArticles = rows.map(r => (r['Код товара'] ?? '').trim()).filter(Boolean)
+    const newRows = filterNewRows(result.rows, existingArticles)
 
     if (newRows.length === 0) {
       setError('Новых товаров не найдено. Все товары уже в базе.')
@@ -220,7 +248,7 @@ export default function App() {
   }
 
   const doUnlock = () => {
-    if (passwordInput !== ADMIN_PASSWORD) { setPasswordError(true); return }
+    if (!ADMIN_PASSWORD || passwordInput !== ADMIN_PASSWORD) { setPasswordError(true); return }
     if (remember) {
       localStorage.setItem('admin_password', passwordInput)
       localStorage.setItem('admin_password_expires', String(Date.now() + PASSWORD_EXPIRY_MS))
@@ -228,7 +256,6 @@ export default function App() {
     setAdminMode(true)
     setShowAdminLogin(false)
     setPasswordInput('')
-    if (ghToken) loadAdminData()
   }
 
   return (
@@ -239,10 +266,10 @@ export default function App() {
           {success && <span className="status ok">{success}</span>}
           {loading && <span className="status loading">Загрузка...</span>}
           {saving && <span className="status loading">Сохранение...</span>}
-          <button onClick={adminMode ? loadAdminData : loadPublicData} disabled={loading}>
+          <button onClick={adminMode ? loadAdminData : loadPublicData} disabled={loading || saving}>
             Обновить
           </button>
-          <button onClick={() => setShowImport(true)} disabled={loading} className="btn btn-import">
+          <button onClick={() => setShowImport(true)} disabled={loading || saving} className="btn btn-import">
             📥 Импорт
           </button>
           <button onClick={() => setShowImportHistory(true)} className="btn btn-history" title="История импортов">
@@ -273,7 +300,7 @@ export default function App() {
                     <label className="token-field">
                       <span className="sr-only">GitHub токен</span>
                       <input type="password" placeholder="GitHub Token" value={ghTokenInput} onChange={e => setGhTokenInput(e.target.value)} className="admin-token-input" autoComplete="new-password" aria-label="GitHub токен доступа" />
-                      <button type="button" className="btn-token-save" onClick={() => { setGhToken(ghTokenInput); localStorage.setItem('gh_token', ghTokenInput); loadAdminData() }}>OK</button>
+                      <button type="button" className="btn-token-save" onClick={() => { const token = ghTokenInput.trim(); setGhToken(token); localStorage.setItem('gh_token', token) }}>OK</button>
                     </label>
                   )}
                 </div>
@@ -292,7 +319,7 @@ export default function App() {
                   )}
                 </div>
               </div>
-              <button className="btn btn-logout" onClick={() => { setAdminMode(false); setGhToken(''); setSewTokenState(''); localStorage.removeItem('gh_token'); localStorage.removeItem('sew_token') }}>
+              <button className="btn btn-logout" onClick={() => { setAdminMode(false); setGhToken(''); setSewTokenState(''); setSha(''); localStorage.removeItem('gh_token'); localStorage.removeItem('sew_token') }}>
                 Выйти
               </button>
             </>
@@ -314,7 +341,7 @@ export default function App() {
       )}
 
       {adminMode && editorRow !== undefined && (
-        <ProductEditor row={editorRow && Object.keys(editorRow).length > 0 ? editorRow : null} onSave={handleEditorSave} onCancel={() => setEditorRow(undefined)} />
+        <ProductEditor row={editorRow && Object.keys(editorRow).length > 0 ? editorRow : null} onSave={handleEditorSave} onCancel={() => setEditorRow(undefined)} error={error} />
       )}
 
       {showImport && (
@@ -326,11 +353,11 @@ export default function App() {
       )}
 
        {sewPreviewRows.length > 0 && (
-         <div className="modal-overlay" onClick={() => setSewPreviewRows([])}>
-           <div className="modal" role="dialog" aria-modal="true" onClick={e => e.stopPropagation()}>
-             <div className="modal-header">
-               <h2>Новые товары из SEW</h2>
-              <button type="button" className="modal-close" onClick={() => setSewPreviewRows([])}>&times;</button>
+<div className="modal-overlay" onClick={saving ? undefined : () => setSewPreviewRows([])}>
+            <div className="modal" role="dialog" aria-modal="true" onClick={e => e.stopPropagation()}>
+              <div className="modal-header">
+                <h2>Новые товары из SEW</h2>
+                <button type="button" className="modal-close" disabled={saving} onClick={() => setSewPreviewRows([])}>&times;</button>
             </div>
             <div className="import-results">
               <p className="import-status new">Найдено новых товаров: {sewPreviewRows.length}</p>
@@ -361,21 +388,23 @@ export default function App() {
                 </div>
               </div>
             </div>
+            {error && <p className="import-error">{error}</p>}
             <div className="modal-actions">
-              <button className="btn-cancel" onClick={() => setSewPreviewRows([])}>Отмена</button>
-              <button className="btn-confirm" onClick={async () => {
-                addImportEntry('sew', sewPreviewRows.length)
-                setImportHistory(loadImportHistory())
-                const updated = [...rows, ...sewPreviewRows]
-                setRows(updated)
-                setSewPreviewRows([])
-                try {
-                  setSaving(true); setError(''); setSuccess('')
-                  await commitPublicJSON(JSON.stringify(updated, null, 2), '[Import] Добавление товаров из SEW')
-                  setSuccess('Добавлено ' + sewPreviewRows.length + ' ' + declension(sewPreviewRows.length, ['товар', 'товара', 'товаров']))
-                } catch (e: unknown) { setError('Ошибка сохранения: ' + (e instanceof Error ? e.message : 'Неизвестная ошибка'))
-                } finally { setSaving(false) }
-              }}>Добавить {sewPreviewRows.length} новых товаров</button>
+              <button className="btn-cancel" disabled={saving} onClick={() => setSewPreviewRows([])}>Отмена</button>
+              <button
+                className="btn-confirm"
+                disabled={saving}
+                onClick={async () => {
+                  try {
+                    await handleImport(sewPreviewRows, 'sew')
+                    setSewPreviewRows([])
+                  } catch (e: unknown) {
+                    setError('Ошибка сохранения: ' + (e instanceof Error ? e.message : 'Неизвестная ошибка'))
+                  }
+                }}
+              >
+                {saving ? 'Сохранение…' : `Добавить ${sewPreviewRows.length} новых товаров`}
+              </button>
             </div>
           </div>
         </div>
@@ -427,7 +456,7 @@ export default function App() {
             </div>
             <div className="admin-login-content">
               <input type="password" placeholder="Пароль администратора" value={passwordInput} onChange={e => { setPasswordInput(e.target.value); setPasswordError(false) }} onKeyDown={e => { if(e.key === 'Enter') doUnlock() }} autoFocus aria-label="Пароль администратора" />
-              {passwordError && <p className="hint" style={{ color:'#c62828', textAlign:'center' }}>Неверный пароль</p>}
+              {passwordError && <p className="hint" style={{ color:'#c62828', textAlign:'center' }}>{ADMIN_PASSWORD ? 'Неверный пароль' : 'Вход недоступен: VITE_ADMIN_PASSWORD не настроен'}</p>}
                <label className="remember-row"><input id="remember-pw" type="checkbox" checked={remember} onChange={e => setRemember(e.target.checked)} /> Запомнить пароль на 2 дня</label>
             </div>
             <div className="modal-actions">

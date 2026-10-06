@@ -18,6 +18,9 @@ const DEFAULT_COLUMN_ORDER: (keyof ProductRow)[] = [
   'Время создания МСК', 'Последнее изменение МСК',
 ]
 
+const NUMERIC_SORT_COLUMNS: (keyof ProductRow)[] = ['Количество']
+const NUMERIC_VALUE = /^(0|[1-9]\d*)(\.\d+)?$/
+
 function loadColumnOrder(): (keyof ProductRow)[] | null {
   try {
     const raw = localStorage.getItem(COLUMN_ORDER_KEY)
@@ -33,11 +36,11 @@ function saveColumnOrder(order: (keyof ProductRow)[]) {
 }
 
 function highlight(text: string, query: string): string {
-  if (!query.trim()) return escapeHtml(text)
   const escaped = escapeHtml(text)
-  const qEscaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const regex = new RegExp(`(${qEscaped})`, 'gi')
-  return escaped.replace(regex, '<mark class="search-hl">$1</mark>')
+  const terms = query.split(',').map(t => t.trim()).filter(Boolean)
+  if (terms.length === 0) return escaped
+  const pattern = terms.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')
+  return escaped.replace(new RegExp(`(${pattern})`, 'gi'), '<mark class="search-hl">$1</mark>')
 }
 
 function escapeHtml(s: string): string {
@@ -73,7 +76,15 @@ export default function ProductTable({ rows, onEdit, onAdd }: Props) {
     el.style.height = `${Math.min(el.scrollHeight, 200)}px`
   }, [search])
 
-  const headers = columnOrder.filter(h => Object.keys(rows[0] || {}).includes(h))
+  const headers = useMemo(() => {
+    const available = Object.keys(rows[0] || {}) as (keyof ProductRow)[]
+    const present = new Set(available)
+    const ordered: (keyof ProductRow)[] = []
+    for (const key of columnOrder) if (present.has(key) && !ordered.includes(key)) ordered.push(key)
+    for (const key of DEFAULT_COLUMN_ORDER) if (present.has(key) && !ordered.includes(key)) ordered.push(key)
+    for (const key of available) if (!ordered.includes(key)) ordered.push(key)
+    return ordered
+  }, [columnOrder, rows])
 
   const [dragSourceIndex, setDragSourceIndex] = useState<number | null>(null)
   const [dragTargetIndex, setDragTargetIndex] = useState<number | null>(null)
@@ -123,13 +134,9 @@ export default function ProductTable({ rows, onEdit, onAdd }: Props) {
     const to = dragTargetIndex
     if (from === null || to === null || from === to) return
 
-    const next = [...columnOrder]
+    const next = [...headers]
     const [moved] = next.splice(from, 1)
     next.splice(to, 0, moved)
-
-    for (const k of Object.keys(rows[0] || {}) as (keyof ProductRow)[]) {
-      if (!next.includes(k) && !DEFAULT_COLUMN_ORDER.includes(k)) next.push(k)
-    }
 
     setColumnOrder(next)
     saveColumnOrder(next)
@@ -149,26 +156,39 @@ export default function ProductTable({ rows, onEdit, onAdd }: Props) {
     if (terms.length === 0) return rows
     return rows.filter(r =>
       terms.every(term =>
-        Object.values(r).some(v => String(v || '').toLowerCase().includes(term))
+        Object.values(r).some(v => String(v ?? '').toLowerCase().includes(term))
       )
     )
   }, [rows, search])
 
   const sorted = useMemo(() => {
+    const numericColumn = NUMERIC_SORT_COLUMNS.includes(sortKey) && filtered.every(r => {
+      const v = String(r[sortKey] ?? '').trim()
+      return v === '' || NUMERIC_VALUE.test(v)
+    })
     return [...filtered].sort((a, b) => {
-      const av = a[sortKey] || ''
-      const bv = b[sortKey] || ''
-      return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av)
+      const av = a[sortKey] ?? ''
+      const bv = b[sortKey] ?? ''
+      const cmp = numericColumn
+        ? Number(av) - Number(bv)
+        : String(av).localeCompare(String(bv))
+      return sortDir === 'asc' ? cmp : -cmp
     })
   }, [filtered, sortKey, sortDir])
 
   const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE))
+
+  useEffect(() => {
+    setPage(p => (p > totalPages ? totalPages : p))
+  }, [totalPages])
+
   const paged = useMemo(() => {
     const start = (page - 1) * PAGE_SIZE
     return sorted.slice(start, start + PAGE_SIZE)
   }, [sorted, page])
 
-  const hasCustomOrder = columnOrder.some((h, i) => h !== DEFAULT_COLUMN_ORDER[i]) || columnOrder.length !== DEFAULT_COLUMN_ORDER.filter(k => Object.keys(rows[0] || {}).includes(k)).length
+  const defaultHeaders = DEFAULT_COLUMN_ORDER.filter(k => Object.keys(rows[0] || {}).includes(k))
+  const hasCustomOrder = headers.length !== defaultHeaders.length || headers.some((h, i) => h !== defaultHeaders[i])
 
   return (
     <div className="table-container">
@@ -212,6 +232,14 @@ export default function ProductTable({ rows, onEdit, onAdd }: Props) {
                     key={key}
                     draggable
                     onClick={() => handleSort(key)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        handleSort(key)
+                      }
+                    }}
+                    tabIndex={0}
+                    aria-sort={sortKey === key ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
                     onDragStart={e => handleDragStart(e as unknown as React.DragEvent<HTMLTableCellElement>, idx)}
                     onDragEnd={handleDragEnd}
                     onDragOver={e => handleDragOver(e as unknown as React.DragEvent<HTMLTableCellElement>, idx)}
@@ -298,12 +326,12 @@ export default function ProductTable({ rows, onEdit, onAdd }: Props) {
           </div>
         </div>
 
-        {hasCustomOrder && (
-          <div className="col-order-bar">
-            <span>Нажмите на заголовок для сортировки · Перетаскивайте заголовки для изменения порядка колонок</span>
+        <div className="col-order-bar">
+          <span>Нажмите на заголовок (или Enter с клавиатуры) для сортировки · Перетаскивайте заголовки для изменения порядка колонок</span>
+          {hasCustomOrder && (
             <button onClick={resetColumns} className="btn-reset-cols" title="Сбросить порядок колонок">↺ Сбросить</button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   )

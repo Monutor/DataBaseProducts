@@ -2,13 +2,12 @@ import { useState, useRef, useMemo, useEffect } from 'react'
 import type { ProductRow } from '../csv/types'
 import './ImportDialog.css'
 import type { ParseResult } from '../shared/parser'
-import { parseCSV, parseXLSX } from '../shared/parser'
+import { parseCSV, parseXLSX, filterNewRows, decodeCsvBuffer } from '../shared/parser'
 
 interface Props {
   rows: ProductRow[]
-  onConfirm: (newRows: ProductRow[]) => void
+  onConfirm: (newRows: ProductRow[]) => Promise<void>
   onCancel: () => void
-  onError?: (msg: string) => void
 }
 
 const EXISTING_ARTICLE = 'Код товара'
@@ -22,7 +21,7 @@ function readFileAsBuffer(file: File): Promise<ArrayBuffer> {
   })
 }
 
-export default function ImportDialog({ rows, onConfirm, onCancel, onError }: Props) {
+export default function ImportDialog({ rows, onConfirm, onCancel }: Props) {
   const [dragOver, setDragOver] = useState(false)
   const [parsed, setParsed] = useState<ProductRow[] | null>(null)
   const [loading, setLoading] = useState(false)
@@ -31,65 +30,64 @@ export default function ImportDialog({ rows, onConfirm, onCancel, onError }: Pro
   const [saved, setSaved] = useState(false)
   const [saveError, setSaveError] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const existingArticles = useMemo(() => {
-    const set = new Set<string>()
-    for (const r of rows) {
-      const code = r[EXISTING_ARTICLE]
-      if (code) set.add(code.trim())
+  const existingArticles = useMemo(
+    () => rows.map(r => (r[EXISTING_ARTICLE] ?? '').trim()).filter(Boolean),
+    [rows]
+  )
+
+  const newRows = useMemo(
+    () => (parsed ? filterNewRows(parsed, existingArticles) : []),
+    [parsed, existingArticles]
+  )
+
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current) clearTimeout(closeTimerRef.current)
     }
-    return set
-  }, [rows])
-
-  const newRows = useMemo(() => {
-    if (!parsed) return []
-    return parsed.filter(r => {
-      const code = r[EXISTING_ARTICLE]
-      return code && !existingArticles.has(code.trim())
-    })
-  }, [parsed, existingArticles])
+  }, [])
 
   const handleFile = async (file: File) => {
     setParseError('')
+    setSaveError('')
     setParsed(null)
     setLoading(true)
     const ext = file.name.split('.').pop()?.toLowerCase()
     let result: ParseResult
-    if (ext === 'csv') {
-      const text = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader()
-        reader.onload = () => resolve(reader.result as string)
-        reader.onerror = () => reject(new Error('Failed to read file'))
-        reader.readAsText(file, 'utf-8')
-      })
-      result = await parseCSV(text)
-    } else if (ext === 'xlsx' || ext === 'xls') {
-      const buffer = await readFileAsBuffer(file)
-      result = await parseXLSX(buffer)
-    } else {
-      setParseError('Поддерживаются только CSV и XLSX файлы')
+    try {
+      if (ext === 'csv') {
+        const buffer = await readFileAsBuffer(file)
+        result = await parseCSV(decodeCsvBuffer(buffer).text)
+      } else if (ext === 'xlsx' || ext === 'xls') {
+        const buffer = await readFileAsBuffer(file)
+        result = await parseXLSX(buffer)
+      } else {
+        setParseError('Поддерживаются только CSV и XLSX файлы')
+        return
+      }
+      if (!result.success) {
+        setParseError(result.error)
+      } else {
+        setParsed(result.rows)
+      }
+    } catch (e: unknown) {
+      setParseError(e instanceof Error ? e.message : 'Не удалось прочитать файл')
+    } finally {
       setLoading(false)
-      return
     }
-    if (!result.success) {
-      setParseError(result.error)
-    } else {
-      setParsed(result.rows)
-    }
-    setLoading(false)
   }
 
   const handleConfirm = async () => {
     if (!parsed || newRows.length === 0) return
+    setSaveError('')
     setSaving(true)
     try {
       await onConfirm(newRows)
       setSaved(true)
-      setTimeout(() => onCancel(), 1200)
+      closeTimerRef.current = setTimeout(() => onCancel(), 1200)
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Неизвестная ошибка'
-      setSaveError(msg)
-      if (onError) onError(msg)
+      setSaveError(e instanceof Error ? e.message : 'Неизвестная ошибка')
     } finally {
       setSaving(false)
     }

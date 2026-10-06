@@ -64,6 +64,15 @@
   margin-bottom: 12px;
 }
 
+.editor-error {
+  margin: 0 0 4px;
+  padding: 8px 10px;
+  border-radius: 5px;
+  background: var(--error-bg);
+  color: var(--error-text);
+  font-size: 12px;
+}
+
 .modal-actions {
   display: flex;
   gap: 8px;
